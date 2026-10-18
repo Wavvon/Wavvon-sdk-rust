@@ -52,12 +52,7 @@ async fn main() -> Out {
             client
                 .call(|api| async move {
                     api.create_channel()
-                        .body(wavvon_sdk::generated::types::CreateChannelBody {
-                            name: "smoke".into(),
-                            description: None,
-                            is_category: None,
-                            parent_id: None,
-                        })
+                        .body_map(|b| b.name("smoke"))
                         .send()
                         .await
                 })
