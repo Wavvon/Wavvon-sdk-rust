@@ -1,0 +1,11 @@
+Wavvon SDK for Rust
+Copyright 2026 The Wavvon contributors
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This crate does not depend on wavvon-identity (AGPL-3.0). The signing
+primitives are implemented here from docs/docs/wire-format.md and checked
+against the shared conformance vectors.
+
+src/generated/ is produced by progenitor (MPL-2.0), which also ships as the
+runtime dependency progenitor-client. Both are used unmodified.
