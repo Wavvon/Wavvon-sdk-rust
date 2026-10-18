@@ -1,0 +1,27 @@
+name: ci
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  WIRE_VECTORS_REF: develop
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Fetch conformance vectors
+        run: |
+          curl -fsSL "https://raw.githubusercontent.com/Wavvon/Wavvon-server/${WIRE_VECTORS_REF}/crates/identity/wire-vectors.json" -o "$RUNNER_TEMP/wire-vectors.json"
+          echo "WAVVON_WIRE_VECTORS=$RUNNER_TEMP/wire-vectors.json" >> "$GITHUB_ENV"
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - run: cargo test --workspace --all-features
