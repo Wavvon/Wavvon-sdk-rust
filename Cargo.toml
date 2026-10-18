@@ -1,0 +1,49 @@
+[workspace]
+members = [".", "xtask"]
+
+[package]
+name = "wavvon-sdk"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.88"
+description = "Rust SDK for Wavvon hubs: write bots and apps (tier 1)"
+license = "Apache-2.0"
+repository = "https://github.com/Wavvon/Wavvon-sdk-rust"
+readme = "README.md"
+publish = false
+
+[dependencies]
+progenitor-client = "0.15"
+reqwest = { version = "0.13", default-features = false, features = ["rustls", "json", "stream", "query"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+futures = "0.3"
+tokio = { version = "1.53.3", features = ["rt", "time", "sync", "macros", "net"] }
+tokio-tungstenite = { version = "0.30.0", default-features = false, features = ["connect", "rustls-tls-webpki-roots"] }
+ed25519-dalek = "3.0.0"
+sha2 = "0.11.1"
+hkdf = "0.13.0"
+hmac = "0.13.0"
+hex = "0.4.3"
+base64 = "0.23.1"
+rand = "0.10.3"
+thiserror = "2.0.21"
+axum = { version = "0.8.9", default-features = false, features = ["http1", "tokio", "json"], optional = true }
+
+[features]
+axum = ["dep:axum"]
+
+[dev-dependencies]
+axum = { version = "0.8.9", features = ["ws"] }
+tokio = { version = "1.53.3", features = ["rt-multi-thread", "macros", "time", "net"] }
+
+[lib]
+doctest = false
+
+[[example]]
+name = "echo_bot"
+required-features = ["axum"]
+
+[[example]]
+name = "smoke"
+required-features = ["axum"]
