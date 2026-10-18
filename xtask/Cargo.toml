@@ -1,0 +1,15 @@
+[package]
+name = "xtask"
+version = "0.0.0"
+edition = "2021"
+publish = false
+license = "Apache-2.0"
+
+[dependencies]
+progenitor = { version = "0.15", default-features = false }
+openapiv3 = "2"
+serde_yaml = "0.9"
+serde_json = "1"
+prettyplease = "0.2"
+syn = "2"
+quote = "1"

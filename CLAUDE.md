@@ -1,0 +1,61 @@
+# CLAUDE.md
+
+Guidance for Claude Code working in this repository.
+
+## What this is
+
+`wavvon-sdk`: the Rust SDK for [Wavvon](https://github.com/Wavvon) hubs, tier 1 (bots and apps). Apache-2.0.
+Contract: <https://github.com/Wavvon/Wavvon-docs/blob/main/docs/sdk.md>. Branch: `develop`.
+
+## Check
+
+`scripts/check` = fmt --check, clippy `-D warnings` (workspace, all targets, all features), tests, docs. CI runs the
+same. Run `rustup update stable` first; toolchain skew breaks clippy.
+
+## Layout
+
+- `src/generated/` is progenitor output from Wavvon-docs `openapi.yaml`. **Never edit by hand.** `SPEC_COMMIT` holds
+  the docs commit. Regenerate with `cargo xtask generate [docs] [--ref <ref>]`.
+- `xtask/` is the generator. The only in-memory spec change left drops the multipart operations
+  (`POST /channels/{id}/upload`, `POST /soundboard`), which progenitor cannot generate; it prints what it dropped.
+  A spec gap belongs in Wavvon-docs, not in a new patch here.
+- `src/session.rs`: the bearer token shared with the generated client (its pre-hook).
+- `src/client.rs`, `src/ws.rs`: session, retry, re-auth, paging, registration, the WebSocket task.
+- `src/auth.rs`, `src/webhooks.rs`: thin wrappers over `wavvon-identity` (Wavvon-server `crates/identity`,
+  Apache-2.0 since 2026-10-18, a git dependency pinned by rev until it is on crates.io) for the signing bytes, the
+  webhook key and HMAC, and the header names. Bump the rev to pick up a wire-format change.
+- `tests/conformance.rs`: byte equality against `wire-vectors.json` (Wavvon-server owns it). Never copy the file in.
+- `tests/session_flow.rs`: retry, re-auth and resume against an in-process fake hub.
+  `examples/smoke.rs` is the real-hub check.
+
+## Rules
+
+- **Wire formats**: never invent one. A new signed byte sequence needs a server-side change and a vector first.
+- **Capabilities, never versions.** A feature needing a string the hub lacks returns `Error::UnsupportedByHub`.
+- **Transient is never an answer.** 429, 5xx, timeouts and socket drops end as `Error::Transient`, not `None`,
+  empty or false.
+- **Unknown is loud.** Unmatched WebSocket types are `Event::Unknown { raw }`; no `_ => {}`.
+- **The seed never leaves the process.** No `is_bot`; a program is not a kind of account.
+- **Webhook verifiers take the hub key the caller trusts**, never the key named in the request.
+- No `#[allow(dead_code)]`; delete what a lint flags. Comments in English, only for a non-obvious why.
+- Commits end with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+
+## Facts that cost time
+
+- The challenge is **hex**: decode it and sign the bytes. The OpenAPI text saying "UTF-8 bytes of the string" is stale.
+- `hub_event` and `resume` work only on a socket whose identity had an app profile when it connected: register first.
+- The hub answers `app_join` itself; the host side is `app_announce`/`app_dismiss` plus `mini_app_message`.
+- The hub never writes `GET /me/events` today; the polling calls follow the spec but nothing here relies on them.
+- A fresh hub has no channel; the smoke example creates one.
+
+## Releasing
+
+Bump `version` in `Cargo.toml` on `develop`, open a PR from `develop` to
+`main`; a maintainer merges it with a merge commit. `.github/workflows/release.yml`
+then runs on `main`: if tag `v<version>` does not exist it runs the check,
+publishes to crates.io through trusted publishing (`rust-lang/crates-io-auth-action`
+exchanges the workflow's OIDC identity for a short-lived token; nothing is
+stored), tags the commit and creates the GitHub release. A version already on
+crates.io is only tagged. The `wavvon-identity` dependency carries both a
+`version` and a pinned `git` rev: builds use the rev, `cargo publish` strips it
+and depends on the crates.io version, so keep the two in step.
