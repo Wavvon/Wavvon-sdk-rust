@@ -405,12 +405,15 @@ impl Client {
 
     /// Every member, paging `GET /users` to exhaustion. Needs `list.cursor`:
     /// without it the hub ignores the cursor and one page is all there is.
-    pub fn users(&self, limit: u64) -> Result<BoxStream<'static, Result<generated::types::User>>> {
+    pub fn users(
+        &self,
+        limit: u64,
+    ) -> Result<BoxStream<'static, Result<generated::types::UserInfo>>> {
         self.require(caps::LIST_CURSOR)?;
         let me = self.clone();
         Ok(pager(
             limit,
-            |u: &generated::types::User| u.public_key.clone(),
+            |u: &generated::types::UserInfo| Some(u.public_key.clone()),
             move |cursor, limit| {
                 let me = me.clone();
                 async move {

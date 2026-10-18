@@ -113,7 +113,7 @@ async fn users(
         .iter()
         .skip(start)
         .take(limit)
-        .map(|u| json!({ "public_key": u }))
+        .map(|u| json!({ "public_key": u, "online": false, "avatar": null, "birthday": null, "display_name": null, "group_role": null, "name_color": null }))
         .collect();
     Json(page).into_response()
 }
@@ -272,7 +272,7 @@ async fn users_pager_walks_every_page_through_the_generated_client() {
     let keys: Vec<String> = client
         .users(2)
         .unwrap()
-        .map(|u| u.unwrap().public_key.unwrap())
+        .map(|u| u.unwrap().public_key)
         .collect()
         .await;
     assert_eq!(keys, ["u0", "u1", "u2", "u3", "u4"]);

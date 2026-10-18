@@ -77,121 +77,35 @@ fn main() {
 
 use serde_yaml::{Mapping, Value};
 
-/// crates/hub/src/routes/apps/models.rs, `AppMeResponse`.
-const APP_REGISTRATION: &str = r#"
-type: object
-required: [pubkey, name, commands]
-properties:
-  pubkey: { type: string }
-  name: { type: string }
-  avatar_url: { type: string }
-  description: { type: string }
-  webhook_url: { type: string }
-  homepage_url: { type: string }
-  commands:
-    type: array
-    items:
-      type: object
-      required: [name, description]
-      properties:
-        name: { type: string }
-        description: { type: string }
-        args: { type: string }
-        scope: { type: string }
-        privileged: { type: boolean }
-        cooldown_seconds: { type: integer }
-"#;
-
-/// Minimal fixes for spec constructs the OpenAPI 3.0 schema (and so progenitor)
-/// rejects. Every fix is reported; the real fix belongs in Wavvon-docs.
+/// Drops the multipart operations progenitor cannot generate
+/// (`POST /channels/{id}/upload`, `POST /soundboard`) and reports them.
 fn preprocess(spec: &mut Value) -> Vec<String> {
-    let mut notes = Vec::new();
-    let mut missing_description = 0;
-    let mut no_responses = 0;
-    let mut dropped: Vec<String> = Vec::new();
-    if let Some(Value::Mapping(paths)) = spec.get_mut("paths") {
-        for (path, item) in paths.iter_mut() {
-            let Value::Mapping(item) = item else { continue };
-            for (method, op) in item.iter_mut() {
-                let Value::Mapping(op) = op else { continue };
-                if !matches!(
-                    method.as_str(),
-                    Some("get" | "put" | "post" | "delete" | "patch" | "head" | "options")
-                ) {
-                    continue;
-                }
-                if has_unsupported_body(op) {
-                    dropped.push(format!(
-                        "{} {}",
-                        method.as_str().unwrap_or("?"),
-                        path.as_str().unwrap_or("?")
-                    ));
-                    continue;
-                }
-                if !op.contains_key("responses") {
-                    let mut ok = Mapping::new();
-                    ok.insert("2XX".into(), Value::Mapping(Mapping::new()));
-                    op.insert("responses".into(), Value::Mapping(ok));
-                    no_responses += 1;
-                }
-                let Some(Value::Mapping(responses)) = op.get_mut("responses") else {
-                    continue;
-                };
-                for (_, resp) in responses.iter_mut() {
-                    fix_response(resp, &mut missing_description);
-                }
+    let Some(Value::Mapping(paths)) = spec.get_mut("paths") else {
+        return Vec::new();
+    };
+    let mut dropped = Vec::new();
+    for (path, item) in paths.iter_mut() {
+        let Value::Mapping(item) = item else { continue };
+        item.retain(|method, op| {
+            let Value::Mapping(op) = op else { return true };
+            if !has_unsupported_body(op) {
+                return true;
             }
-        }
+            dropped.push(format!(
+                "{} {}",
+                method.as_str().unwrap_or("?"),
+                path.as_str().unwrap_or("?")
+            ));
+            false
+        });
     }
-    // Dropped after the walk: removing while iterating would need two passes anyway.
-    if let Some(Value::Mapping(paths)) = spec.get_mut("paths") {
-        for entry in &dropped {
-            let (method, path) = entry.split_once(' ').expect("method path");
-            if let Some(Value::Mapping(item)) = paths.get_mut(path) {
-                item.remove(method);
-            }
-        }
+    if dropped.is_empty() {
+        return Vec::new();
     }
-    if !dropped.is_empty() {
-        notes.push(format!(
-            "progenitor handles only JSON bodies; dropped: {}",
-            dropped.join(", ")
-        ));
-    }
-    if let Some(Value::Mapping(schemas)) = spec
-        .get_mut("components")
-        .and_then(|c| c.get_mut("schemas"))
-    {
-        if !schemas.contains_key("AppRegistration") {
-            let def: Value = serde_yaml::from_str(APP_REGISTRATION).expect("snippet parses");
-            schemas.insert("AppRegistration".into(), def);
-            notes.push(
-                "AppRegistration is referenced but never defined; patched in from AppMeResponse"
-                    .into(),
-            );
-        }
-    }
-    if missing_description > 0 {
-        notes.push(format!(
-            "{missing_description} responses without a description got an empty one"
-        ));
-    }
-    if no_responses > 0 {
-        notes.push(format!("{no_responses} operations without responses got an empty 2XX (the hub answers 200, 201 or 204 and the spec does not say which)"));
-    }
-    notes
-}
-
-fn fix_response(resp: &mut Value, count: &mut usize) {
-    if let Value::Mapping(m) = resp {
-        if !m.contains_key("$ref") && !m.contains_key("description") {
-            let mut fixed = Mapping::new();
-            fixed.insert("description".into(), "".into());
-            fixed.extend(std::mem::take(m));
-            *m = fixed;
-            *count += 1;
-        }
-    }
+    vec![format!(
+        "progenitor handles only JSON bodies; dropped: {}",
+        dropped.join(", ")
+    )]
 }
 
 fn has_unsupported_body(op: &Mapping) -> bool {

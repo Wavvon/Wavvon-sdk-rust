@@ -16,11 +16,9 @@ same. Run `rustup update stable` first; toolchain skew breaks clippy.
 
 - `src/generated/` is progenitor output from Wavvon-docs `openapi.yaml`. **Never edit by hand.** `SPEC_COMMIT` holds
   the docs commit. Regenerate with `cargo xtask generate [docs] [--ref <ref>]`.
-- `xtask/` is the generator. It patches the spec in memory and prints each fix: responses without `description`
-  and operations without `responses` (progenitor needs both; the latter get a `2XX` because the hub answers 200, 201
-  or 204 and the spec does not say which), the undefined `AppRegistration` schema, and multipart operations
-  (`POST /channels/{id}/upload`, `POST /soundboard`), which progenitor cannot generate and are dropped. When the
-  spec is fixed the matching patch stops applying; delete it then.
+- `xtask/` is the generator. The only in-memory spec change left drops the multipart operations
+  (`POST /channels/{id}/upload`, `POST /soundboard`), which progenitor cannot generate; it prints what it dropped.
+  A spec gap belongs in Wavvon-docs, not in a new patch here.
 - `src/session.rs`: the bearer token shared with the generated client (its pre-hook).
 - `src/client.rs`, `src/ws.rs`: session, retry, re-auth, paging, registration, the WebSocket task.
 - `src/auth.rs`, `src/webhooks.rs`: the signing primitives. Hand-written on purpose: `wavvon-identity` is AGPL-3.0

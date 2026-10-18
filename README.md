@@ -100,8 +100,8 @@ the sender names proves nothing. Verify the raw bytes before parsing. The 300 s 
 (`crates/identity/wire-vectors.json`). It reads `WAVVON_WIRE_VECTORS`, else
 `../../server/crates/identity/wire-vectors.json`. A missing file fails when `CI` is set and prints a loud skip otherwise.
 
-Pin: the CI workflow fetches the vectors at `WIRE_VECTORS_REF` (`.github/workflows/ci.yml`); bump it in the PR that
-takes new vectors. The generated REST code is pinned to the Wavvon-docs commit in `src/generated/SPEC_COMMIT`.
+Pin: the CI workflow fetches the vectors at `WIRE_VECTORS_REF` (`.github/workflows/ci.yml`), currently Wavvon-server
+`eb11d75657ee8362dd42a7982fc5b13a3dcc4e68`; bump it in the PR that takes new vectors. The generated REST code is pinned to the Wavvon-docs commit in `src/generated/SPEC_COMMIT`.
 
 ## Regenerating the REST client
 
