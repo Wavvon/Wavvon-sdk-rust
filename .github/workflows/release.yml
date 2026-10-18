@@ -1,0 +1,64 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - id: ver
+        run: echo "version=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -1)" >> "$GITHUB_OUTPUT"
+      - run: test -n "${{ steps.ver.outputs.version }}"
+      - id: tag
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/v${{ steps.ver.outputs.version }}" >/dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.tag.outputs.exists == 'false'
+        uses: actions/checkout@v4
+        with:
+          repository: Wavvon/Wavvon-server
+          ref: eb11d75657ee8362dd42a7982fc5b13a3dcc4e68
+          path: wavvon-server
+          sparse-checkout: crates/identity/wire-vectors.json
+          sparse-checkout-cone-mode: false
+      - if: steps.tag.outputs.exists == 'false'
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - if: steps.tag.outputs.exists == 'false'
+        run: ./scripts/check
+        env:
+          CI: "true"
+          WAVVON_WIRE_VECTORS: ${{ github.workspace }}/wavvon-server/crates/identity/wire-vectors.json
+      - if: steps.tag.outputs.exists == 'false'
+        id: published
+        run: |
+          if curl -fsS -A "Wavvon-sdk-rust release (https://github.com/Wavvon/Wavvon-sdk-rust)" "https://crates.io/api/v1/crates/wavvon-sdk/${{ steps.ver.outputs.version }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.tag.outputs.exists == 'false' && steps.published.outputs.exists == 'false'
+        id: auth
+        uses: rust-lang/crates-io-auth-action@v1
+      - if: steps.tag.outputs.exists == 'false' && steps.published.outputs.exists == 'false'
+        run: cargo publish -p wavvon-sdk
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+      - if: steps.tag.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git tag "v${{ steps.ver.outputs.version }}"
+          git push origin "v${{ steps.ver.outputs.version }}"
+          gh release create "v${{ steps.ver.outputs.version }}" --generate-notes --title "v${{ steps.ver.outputs.version }}"

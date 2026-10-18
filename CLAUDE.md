@@ -47,3 +47,15 @@ same. Run `rustup update stable` first; toolchain skew breaks clippy.
 - The hub answers `app_join` itself; the host side is `app_announce`/`app_dismiss` plus `mini_app_message`.
 - The hub never writes `GET /me/events` today; the polling calls follow the spec but nothing here relies on them.
 - A fresh hub has no channel; the smoke example creates one.
+
+## Releasing
+
+Bump `version` in `Cargo.toml` on `develop`, open a PR from `develop` to
+`main`; a maintainer merges it with a merge commit. `.github/workflows/release.yml`
+then runs on `main`: if tag `v<version>` does not exist it runs the check,
+publishes to crates.io through trusted publishing (`rust-lang/crates-io-auth-action`
+exchanges the workflow's OIDC identity for a short-lived token; nothing is
+stored), tags the commit and creates the GitHub release. A version already on
+crates.io is only tagged. The `wavvon-identity` dependency carries both a
+`version` and a pinned `git` rev: builds use the rev, `cargo publish` strips it
+and depends on the crates.io version, so keep the two in step.
