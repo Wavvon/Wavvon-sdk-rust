@@ -10,7 +10,10 @@ description = "Rust SDK for Wavvon hubs: write bots and apps (tier 1)"
 license = "Apache-2.0"
 repository = "https://github.com/Wavvon/Wavvon-sdk-rust"
 readme = "README.md"
-publish = false
+homepage = "https://github.com/Wavvon/Wavvon-docs/blob/main/docs/sdk.md"
+keywords = ["wavvon", "bot", "sdk", "chat", "federation"]
+categories = ["api-bindings", "web-programming::websocket"]
+exclude = [".cargo/", ".github/", "scripts/", "CLAUDE.md", "CONTRIBUTING.md"]
 
 [dependencies]
 progenitor-client = "0.15"
@@ -21,7 +24,7 @@ futures = "0.3"
 tokio = { version = "1.53.3", features = ["rt", "time", "sync", "macros", "net"] }
 tokio-tungstenite = { version = "0.30.0", default-features = false, features = ["connect", "rustls-tls-webpki-roots"] }
 ed25519-dalek = "3.0.0"
-wavvon-identity = { git = "https://github.com/Wavvon/Wavvon-server", rev = "14918c02314c4808a95514181e0e00bb2cae2e72" }
+wavvon-identity = { version = "0.1.0", git = "https://github.com/Wavvon/Wavvon-server", rev = "14918c02314c4808a95514181e0e00bb2cae2e72" }
 hex = "0.4.3"
 hmac = "0.13.0"
 sha2 = "0.11.1"
