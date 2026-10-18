@@ -21,8 +21,9 @@ same. Run `rustup update stable` first; toolchain skew breaks clippy.
   A spec gap belongs in Wavvon-docs, not in a new patch here.
 - `src/session.rs`: the bearer token shared with the generated client (its pre-hook).
 - `src/client.rs`, `src/ws.rs`: session, retry, re-auth, paging, registration, the WebSocket task.
-- `src/auth.rs`, `src/webhooks.rs`: the signing primitives. Hand-written on purpose: `wavvon-identity` is AGPL-3.0
-  and this crate is Apache-2.0, so it must neither depend on it nor copy its source. Implement from `wire-format.md`.
+- `src/auth.rs`, `src/webhooks.rs`: thin wrappers over `wavvon-identity` (Wavvon-server `crates/identity`,
+  Apache-2.0 since 2026-10-18, a git dependency pinned by rev until it is on crates.io) for the signing bytes, the
+  webhook key and HMAC, and the header names. Bump the rev to pick up a wire-format change.
 - `tests/conformance.rs`: byte equality against `wire-vectors.json` (Wavvon-server owns it). Never copy the file in.
 - `tests/session_flow.rs`: retry, re-auth and resume against an in-process fake hub.
   `examples/smoke.rs` is the real-hub check.

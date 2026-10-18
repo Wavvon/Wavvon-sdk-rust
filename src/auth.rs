@@ -2,10 +2,9 @@ use ed25519_dalek::{Signer, SigningKey};
 
 use crate::error::AuthError;
 
-pub const AUTH_CHALLENGE_SCHEME: &str = "tagged-v1";
+pub use wavvon_identity::AUTH_CHALLENGE_SCHEME;
 /// Length of a challenge a Wavvon hub issues; the only length signed raw.
 pub const AUTH_CHALLENGE_LEN: usize = 32;
-const AUTH_CHALLENGE_TAG: &[u8] = b"wavvon/auth-challenge/v1\0";
 
 /// The program's keypair. The seed stays in this process: nothing here sends
 /// it anywhere.
@@ -57,11 +56,7 @@ pub fn challenge_signing_bytes(
     scheme: Option<&str>,
 ) -> Result<Vec<u8>, AuthError> {
     match scheme {
-        Some(AUTH_CHALLENGE_SCHEME) => {
-            let mut buf = AUTH_CHALLENGE_TAG.to_vec();
-            buf.extend_from_slice(challenge);
-            Ok(buf)
-        }
+        Some(AUTH_CHALLENGE_SCHEME) => Ok(wavvon_identity::auth_challenge_signing_bytes(challenge)),
         Some(other) => Err(AuthError::UnknownScheme(other.to_string())),
         None if challenge.len() == AUTH_CHALLENGE_LEN => Ok(challenge.to_vec()),
         None => Err(AuthError::RawChallengeLength(challenge.len())),

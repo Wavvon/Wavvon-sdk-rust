@@ -5,8 +5,8 @@ A program is a client like any other: a keypair, the same challenge, the same se
 
 Design and contract: <https://github.com/Wavvon/Wavvon-docs/blob/main/docs/sdk.md>
 
-Licence: Apache-2.0. The crate does not depend on `wavvon-identity` (AGPL-3.0); the few signing primitives are
-implemented here and pinned to the shared conformance vectors.
+Licence: Apache-2.0. The signing primitives come from `wavvon-identity`, the hub's own wire-format crate (also
+Apache-2.0), and are still checked against the shared conformance vectors.
 
 ## Install
 

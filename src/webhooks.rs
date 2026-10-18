@@ -9,14 +9,9 @@ use sha2::Sha256;
 
 use crate::error::VerifyError;
 
-pub const HEADER_HUB_PUBKEY: &str = "X-Wavvon-Hub-Pubkey";
-pub const HEADER_SIGNATURE_V1: &str = "X-Wavvon-Signature-V1";
-pub const HEADER_TIMESTAMP: &str = "X-Wavvon-Timestamp";
+pub use wavvon_identity::{HEADER_HUB_PUBKEY, HEADER_SIGNATURE_V1, HEADER_TIMESTAMP};
 /// A delivery older (or newer) than this is refused.
 pub const MAX_SKEW_SECS: u64 = 300;
-
-const DELIVERY_TAG: &[u8] = b"wavvon/webhook-delivery/v1\0";
-const HKDF_SALT: &[u8] = b"wavvon-webhook-signing";
 
 /// The headers a verifier reads; `None` where the request had none.
 #[derive(Clone, Copy, Debug, Default)]
@@ -34,26 +29,17 @@ pub fn unix_now() -> u64 {
 
 /// `tag || timestamp (u64 LE) || body`: what both signatures cover.
 pub fn delivery_signing_bytes(timestamp: u64, body: &[u8]) -> Vec<u8> {
-    let mut buf = DELIVERY_TAG.to_vec();
-    buf.extend_from_slice(&timestamp.to_le_bytes());
-    buf.extend_from_slice(body);
-    buf
+    wavvon_identity::webhook_delivery_signing_bytes(timestamp, body)
 }
 
 /// The HMAC key for an outgoing webhook: HKDF-SHA256 over the 32 bytes the
 /// secret decodes to, salt `wavvon-webhook-signing`, empty info.
 pub fn outgoing_signing_key(raw_secret: &[u8]) -> [u8; 32] {
-    let hk = hkdf::Hkdf::<Sha256>::new(Some(HKDF_SALT), raw_secret);
-    let mut key = [0u8; 32];
-    hk.expand(b"", &mut key)
-        .expect("32 bytes is a valid HKDF-SHA256 output length");
-    key
+    wavvon_identity::outgoing_webhook_signing_key(raw_secret)
 }
 
 pub fn hmac_sha256(key: &[u8], message: &[u8]) -> [u8; 32] {
-    let mut mac = Hmac::<Sha256>::new_from_slice(key).expect("HMAC takes any key length");
-    mac.update(message);
-    mac.finalize().into_bytes().into()
+    wavvon_identity::webhook_hmac_sha256(key, message).expect("HMAC takes any key length")
 }
 
 fn timestamp_in_window(raw: &str, now: u64) -> Result<u64, VerifyError> {
@@ -136,6 +122,7 @@ pub fn verify_outgoing_webhook(
         .parse()
         .map_err(|_| VerifyError::BadHeader(HEADER_TIMESTAMP))?;
 
+    // Constant-time comparison, which is why this does not compare against hmac_sha256().
     let mut mac = Hmac::<Sha256>::new_from_slice(&outgoing_signing_key(&raw))
         .expect("HMAC takes any key length");
     mac.update(&delivery_signing_bytes(ts, body));
