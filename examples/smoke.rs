@@ -10,7 +10,7 @@
 use std::time::Duration;
 
 use tokio::sync::mpsc;
-use wavvon_sdk::apps::{Answer, AppCommand, AppProfile, Invocation, SlashResponse};
+use wavvon_sdk::apps::{Answer, AppCommand, AppProfile, Invocation, SlashResponse, Subscription};
 use wavvon_sdk::axum_handler::router;
 use wavvon_sdk::{Client, ConnectOptions, Event, EventsOptions, Identity};
 
@@ -92,6 +92,12 @@ async fn main() -> Out {
             ..Default::default()
         }])
         .await?;
+    client
+        .put_app_subscriptions(&[Subscription {
+            event: "message.created".into(),
+            channels: Some(vec![channel.clone()]),
+        }])
+        .await?;
     println!("registered profile and /smokecmd");
 
     let mut events = client.events(EventsOptions::default());
@@ -116,6 +122,19 @@ async fn main() -> Out {
     })
     .await?;
     println!("posted and received");
+
+    let polled = client.poll_events(None, None).await?;
+    let ours = polled
+        .iter()
+        .find(|e| e.event == "message.created" && e.payload["content"] == "smoke ping")
+        .ok_or("polling did not return our message")?;
+    let last = polled.last().map(|e| e.seq).unwrap_or_default();
+    let after = client.poll_events(Some(last), None).await?;
+    assert!(
+        after.iter().all(|e| e.seq > last),
+        "the cursor did not page forward"
+    );
+    println!("polled {} events, ours at seq {}", polled.len(), ours.seq);
 
     client
         .send_message(&channel, "/smokecmd hello", None)

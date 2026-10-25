@@ -14,7 +14,7 @@ use crate::apps::{AppCommand, AppProfile, AppRegistration, Subscription};
 use crate::auth::Identity;
 use crate::caps::{self, Capabilities};
 use crate::error::{Error, Result};
-use crate::events::{ChatMessage, ClientMessage, Event, PolledEvent};
+use crate::events::{ChatMessage, ClientMessage, Event, HubEvent};
 use crate::generated;
 use crate::pager::pager;
 use crate::retry::{classify, RetryPolicy, Verdict};
@@ -497,32 +497,45 @@ impl Client {
 
     // ---- polling transport ----
 
-    pub async fn poll_events(&self, since: Option<i64>) -> Result<Vec<PolledEvent>> {
-        #[derive(Deserialize)]
-        struct Polled {
-            events: Vec<PolledEvent>,
+    /// `GET /me/events`: the same `hub_event` envelopes the socket replays,
+    /// oldest first, after `cursor` (the last `seq` handled). Nothing is
+    /// acknowledged. No cursor starts at the beginning of the 72-hour window;
+    /// a cursor older than it is [`Error::ReplayUnavailable`].
+    pub async fn poll_events(
+        &self,
+        cursor: Option<i64>,
+        limit: Option<u32>,
+    ) -> Result<Vec<HubEvent>> {
+        let mut query: Vec<(&str, String)> = Vec::new();
+        if let Some(c) = cursor {
+            query.push(("cursor", c.to_string()));
         }
-        let query: Vec<(&str, String)> = since
-            .map(|s| ("since", s.to_string()))
-            .into_iter()
-            .collect();
-        let p: Polled = self
-            .json(Method::GET, "/me/events", &query, None, true)
-            .await?;
-        Ok(p.events)
-    }
-
-    pub async fn ack_events(&self, ids: &[String]) -> Result<()> {
+        if let Some(l) = limit {
+            query.push(("limit", l.to_string()));
+        }
         let resp = self
-            .execute(
-                Method::DELETE,
-                "/me/events",
-                &[],
-                Some(&json!({ "ids": ids })),
-                true,
-            )
+            .execute(Method::GET, "/me/events", &query, None, true)
             .await?;
-        ok_or_status(resp).await.map(|_| ())
+        if resp.status() == reqwest::StatusCode::GONE {
+            #[derive(Deserialize)]
+            struct Gone {
+                earliest_seq: i64,
+                earliest_at: i64,
+            }
+            let g: Gone = resp
+                .json()
+                .await
+                .map_err(|e| Error::Decode(e.to_string()))?;
+            return Err(Error::ReplayUnavailable {
+                earliest_seq: g.earliest_seq,
+                earliest_at: g.earliest_at,
+            });
+        }
+        ok_or_status(resp)
+            .await?
+            .json()
+            .await
+            .map_err(|e| Error::Decode(e.to_string()))
     }
 
     // ---- websocket ----
