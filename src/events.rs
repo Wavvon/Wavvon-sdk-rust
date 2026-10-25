@@ -240,21 +240,6 @@ pub enum ClientMessage {
     },
 }
 
-/// One polled event from `GET /me/events`. `payload` is a JSON string.
-#[derive(Clone, Debug, Deserialize)]
-pub struct PolledEvent {
-    pub id: String,
-    pub event_type: String,
-    pub payload: String,
-    pub created_at: i64,
-}
-
-impl PolledEvent {
-    pub fn payload_json<T: serde::de::DeserializeOwned>(&self) -> serde_json::Result<T> {
-        serde_json::from_str(&self.payload)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use serde_json::json;

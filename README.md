@@ -60,7 +60,7 @@ A fuller bot with a slash command is `examples/echo_bot.rs`.
 | Capabilities from `GET /info`, typed `Error::UnsupportedByHub` | `caps`, `Client::require` |
 | Keyset pager as a `Stream` (`Client::users`) | `pager` |
 | WebSocket loop: seq tracking, `resume`, `replay_unavailable` surfaced, `Event::Unknown { raw }` | `Client::events` |
-| HTTP polling `GET`/`DELETE /me/events` | `Client::poll_events`, `ack_events` |
+| HTTP polling `GET /me/events` | `Client::poll_events` (cursor = last `seq`) |
 | App registration | `Client::put_app_profile`, `put_app_commands`, `put_app_subscriptions` |
 | Slash/component dispatch verifier, invocation decoding, reply shapes | `webhooks::verify_dispatch`, `apps` |
 | Outgoing-webhook verifier (HKDF + HMAC) | `webhooks::verify_outgoing_webhook` |

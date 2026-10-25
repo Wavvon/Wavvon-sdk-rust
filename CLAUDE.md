@@ -45,7 +45,7 @@ same. Run `rustup update stable` first; toolchain skew breaks clippy.
 - The challenge is **hex**: decode it and sign the bytes. The OpenAPI text saying "UTF-8 bytes of the string" is stale.
 - `hub_event` and `resume` work only on a socket whose identity had an app profile when it connected: register first.
 - The hub answers `app_join` itself; the host side is `app_announce`/`app_dismiss` plus `mini_app_message`.
-- The hub never writes `GET /me/events` today; the polling calls follow the spec but nothing here relies on them.
+- `GET /me/events` reads the audit log (Wavvon-server#183): `hub_event` envelopes after a `seq` cursor, 410 outside the 72-hour window, no ack.
 - A fresh hub has no channel; the smoke example creates one.
 
 ## Releasing

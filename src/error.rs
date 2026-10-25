@@ -21,6 +21,10 @@ pub enum Error {
     Decode(String),
     #[error("the event stream is closed")]
     Closed,
+    /// A poll cursor is older than the hub's 72-hour window: events after it
+    /// were missed. Resynchronise from REST, then poll without a cursor.
+    #[error("events before seq {earliest_seq} are outside the hub's replay window")]
+    ReplayUnavailable { earliest_seq: i64, earliest_at: i64 },
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
