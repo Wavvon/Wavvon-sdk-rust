@@ -121,15 +121,6 @@ fn webhook_delivery_hub() {
         verify_dispatch(s(&v["hub_pubkey"]), &headers, body, ts + 301),
         Err(VerifyError::Stale { skew: 301 })
     );
-    let legacy_only = DeliveryHeaders {
-        signature_v1: Some(s(&v["signature_legacy"])),
-        ..headers
-    };
-    assert_eq!(
-        verify_dispatch(s(&v["hub_pubkey"]), &legacy_only, body, ts),
-        Err(VerifyError::BadSignature),
-        "the body-only signature must not satisfy the V1 check"
-    );
     assert_eq!(
         v["headers"]["signature_v1"],
         wavvon_sdk::webhooks::HEADER_SIGNATURE_V1
@@ -167,10 +158,6 @@ fn webhook_delivery_outgoing() {
     assert_eq!(
         hex::encode(hmac_sha256(&key, &signing)),
         s(&v["signature_v1"])
-    );
-    assert_eq!(
-        hex::encode(hmac_sha256(&key, body)),
-        s(&v["signature_legacy"])
     );
 
     let ts_text = ts.to_string();

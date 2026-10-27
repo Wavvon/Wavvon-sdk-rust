@@ -31,12 +31,11 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum AuthError {
-    #[error("hub named an unknown challenge scheme `{0}`")]
-    UnknownScheme(String),
+    /// The hub named no scheme, or one this SDK does not sign. Never answered raw.
+    #[error("hub named no supported challenge scheme (got {0:?})")]
+    UnknownScheme(Option<String>),
     #[error("challenge is not hex")]
     ChallengeNotHex,
-    #[error("an untagged challenge must be exactly 32 bytes, got {0}")]
-    RawChallengeLength(usize),
     #[error("seed must be 32 bytes of hex")]
     BadSeed,
 }

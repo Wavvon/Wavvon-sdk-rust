@@ -7,7 +7,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  WIRE_VECTORS_REF: eb11d75657ee8362dd42a7982fc5b13a3dcc4e68
+  WIRE_VECTORS_REF: b991cb192df86ee002d10c065872cb8beaeab3c0
 
 jobs:
   check:

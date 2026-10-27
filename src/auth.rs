@@ -3,8 +3,6 @@ use ed25519_dalek::{Signer, SigningKey};
 use crate::error::AuthError;
 
 pub use wavvon_identity::AUTH_CHALLENGE_SCHEME;
-/// Length of a challenge a Wavvon hub issues; the only length signed raw.
-pub const AUTH_CHALLENGE_LEN: usize = 32;
 
 /// The program's keypair. The seed stays in this process: nothing here sends
 /// it anywhere.
@@ -48,18 +46,16 @@ impl std::fmt::Debug for Identity {
     }
 }
 
-/// The bytes signed for a challenge. A named scheme is tagged; no scheme (an
-/// older hub) signs the raw challenge, and only at the length a hub issues, so
-/// the SDK cannot be used as a signing oracle for arbitrary bytes.
+/// The bytes signed for a challenge: only `tagged-v1` is answered. A missing or
+/// unknown scheme is refused, never signed raw, so the SDK cannot be used as a
+/// signing oracle for arbitrary bytes.
 pub fn challenge_signing_bytes(
     challenge: &[u8],
     scheme: Option<&str>,
 ) -> Result<Vec<u8>, AuthError> {
     match scheme {
         Some(AUTH_CHALLENGE_SCHEME) => Ok(wavvon_identity::auth_challenge_signing_bytes(challenge)),
-        Some(other) => Err(AuthError::UnknownScheme(other.to_string())),
-        None if challenge.len() == AUTH_CHALLENGE_LEN => Ok(challenge.to_vec()),
-        None => Err(AuthError::RawChallengeLength(challenge.len())),
+        other => Err(AuthError::UnknownScheme(other.map(str::to_string))),
     }
 }
 
@@ -77,18 +73,10 @@ mod tests {
     }
 
     #[test]
-    fn no_scheme_signs_raw_only_at_32_bytes() {
+    fn missing_scheme_is_refused_not_raw() {
         assert_eq!(
-            challenge_signing_bytes(&[7; 32], None).unwrap(),
-            vec![7; 32]
-        );
-        assert_eq!(
-            challenge_signing_bytes(&[7; 31], None),
-            Err(AuthError::RawChallengeLength(31))
-        );
-        assert_eq!(
-            challenge_signing_bytes(&[], None),
-            Err(AuthError::RawChallengeLength(0))
+            challenge_signing_bytes(&[7; 32], None),
+            Err(AuthError::UnknownScheme(None))
         );
     }
 
@@ -96,7 +84,7 @@ mod tests {
     fn unknown_scheme_is_an_error_not_raw() {
         assert_eq!(
             challenge_signing_bytes(&[7; 32], Some("tagged-v2")),
-            Err(AuthError::UnknownScheme("tagged-v2".into()))
+            Err(AuthError::UnknownScheme(Some("tagged-v2".into())))
         );
     }
 
@@ -104,7 +92,7 @@ mod tests {
     fn challenge_must_be_hex() {
         let id = Identity::from_seed([1; 32]);
         assert_eq!(
-            id.sign_challenge("zz", None),
+            id.sign_challenge("zz", Some(AUTH_CHALLENGE_SCHEME)),
             Err(AuthError::ChallengeNotHex)
         );
     }

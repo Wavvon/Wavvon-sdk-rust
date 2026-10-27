@@ -54,7 +54,7 @@ A fuller bot with a slash command is `examples/echo_bot.rs`.
 | Piece | Where |
 |---|---|
 | Generated REST client, whole API (`client.rest()`; wrap in `client.call(..)` for retry and re-auth) | `generated`, `Client::call` |
-| Auth: `tagged-v1` signing, raw only for exactly 32 bytes, unknown scheme refused | `auth` |
+| Auth: `tagged-v1` signing; a missing or unknown scheme is refused | `auth` |
 | Retry: capped exponential backoff with jitter on 429/5xx/408/network; transient is `Error::Transient`, never an answer | `retry`, `Client` |
 | Re-auth on 401, observable `ConnectionState` | `Client::state` |
 | Capabilities from `GET /info`, typed `Error::UnsupportedByHub` | `caps`, `Client::require` |
