@@ -12,7 +12,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - id: ver
         run: echo "version=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -1)" >> "$GITHUB_OUTPUT"
       - run: test -n "${{ steps.ver.outputs.version }}"
@@ -24,7 +24,7 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
       - if: steps.tag.outputs.exists == 'false'
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: Wavvon/Wavvon-server
           ref: b991cb192df86ee002d10c065872cb8beaeab3c0
@@ -32,7 +32,7 @@ jobs:
           sparse-checkout: crates/identity/wire-vectors.json
           sparse-checkout-cone-mode: false
       - if: steps.tag.outputs.exists == 'false'
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8
         with:
           components: rustfmt, clippy
       - if: steps.tag.outputs.exists == 'false'
@@ -50,7 +50,7 @@ jobs:
           fi
       - if: steps.tag.outputs.exists == 'false' && steps.published.outputs.exists == 'false'
         id: auth
-        uses: rust-lang/crates-io-auth-action@v1
+        uses: rust-lang/crates-io-auth-action@3268eb413133e2960fa4ae0e963ca76380c54cd9
       - if: steps.tag.outputs.exists == 'false' && steps.published.outputs.exists == 'false'
         run: cargo publish -p wavvon-sdk
         env:
