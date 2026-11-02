@@ -2453,6 +2453,7 @@ dependencies = [
  "hmac 0.13.0",
  "progenitor-client",
  "rand 0.10.3",
+ "regress",
  "reqwest",
  "serde",
  "serde_json",
