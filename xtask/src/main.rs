@@ -78,7 +78,7 @@ fn main() {
 use serde_yaml::{Mapping, Value};
 
 /// Drops the multipart operations progenitor cannot generate
-/// (`POST /channels/{id}/upload`, `POST /soundboard`) and reports them.
+/// (`POST /channels/{id}/upload`, `POST /stickers/packs/{id}/stickers`, `POST /soundboard`) and reports them.
 fn preprocess(spec: &mut Value) -> Vec<String> {
     let Some(Value::Mapping(paths)) = spec.get_mut("paths") else {
         return Vec::new();
