@@ -351,10 +351,11 @@ impl Client {
                     false,
                 )
                 .await?;
-            let signature = self
-                .inner
-                .identity
-                .sign_challenge(&ch.challenge, ch.scheme.as_deref())?;
+            let signature = self.inner.identity.sign_challenge(
+                &ch.challenge,
+                ch.scheme.as_deref(),
+                &self.hub_public_key(),
+            )?;
             let mut body = json!({
                 "public_key": pubkey,
                 "challenge": ch.challenge,

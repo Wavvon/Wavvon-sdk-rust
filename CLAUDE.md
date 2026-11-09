@@ -42,6 +42,9 @@ same. Run `rustup update stable` first; toolchain skew breaks clippy.
 
 ## Facts that cost time
 
+- `tagged-v2` (Wavvon-server#294) signs the hub key from `/info`, never one from the challenge response. Its bytes
+  are mirrored in `src/auth.rs` because `wavvon-identity` 0.4.0 (which has `bound_auth_challenge_signing_bytes`) is
+  not on crates.io yet; once it is, bump the dependency and call it instead.
 - The challenge is **hex**: decode it and sign the bytes. The OpenAPI text saying "UTF-8 bytes of the string" is stale.
 - `hub_event` and `resume` work only on a socket whose identity had an app profile when it connected: register first.
 - The hub answers `app_join` itself; the host side is `app_announce`/`app_dismiss` plus `mini_app_message`.

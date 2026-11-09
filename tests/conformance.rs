@@ -6,7 +6,9 @@ use std::path::PathBuf;
 
 use ed25519_dalek::{Signer, SigningKey};
 use serde_json::Value;
-use wavvon_sdk::auth::{challenge_signing_bytes, Identity, AUTH_CHALLENGE_SCHEME};
+use wavvon_sdk::auth::{
+    challenge_signing_bytes, Identity, AUTH_CHALLENGE_SCHEME, BOUND_AUTH_CHALLENGE_SCHEME,
+};
 use wavvon_sdk::error::VerifyError;
 use wavvon_sdk::webhooks::{
     delivery_signing_bytes, hmac_sha256, outgoing_signing_key, verify_dispatch,
@@ -76,12 +78,37 @@ fn auth_challenge() {
     let Some(vectors) = load() else { return };
     let v = vectors.vector("auth_challenge");
     let challenge = unhex(&v["inputs"]["challenge"]);
-    let signing = challenge_signing_bytes(&challenge, Some(AUTH_CHALLENGE_SCHEME)).unwrap();
+    let signing = challenge_signing_bytes(&challenge, Some(AUTH_CHALLENGE_SCHEME), "").unwrap();
     assert_eq!(hex::encode(signing), s(&v["signing_bytes"]));
 
     let id = Identity::from_seed_hex(s(&v["inputs"]["signer_seed"])).unwrap();
     let sig = id
-        .sign_challenge(s(&v["inputs"]["challenge"]), Some(AUTH_CHALLENGE_SCHEME))
+        .sign_challenge(
+            s(&v["inputs"]["challenge"]),
+            Some(AUTH_CHALLENGE_SCHEME),
+            "",
+        )
+        .unwrap();
+    assert_eq!(sig, s(&v["signature"]));
+}
+
+#[test]
+fn bound_auth_challenge() {
+    let Some(vectors) = load() else { return };
+    let v = vectors.vector("bound_auth_challenge");
+    let server = s(&v["inputs"]["server_pubkey"]);
+    let challenge = unhex(&v["inputs"]["challenge"]);
+    let signing =
+        challenge_signing_bytes(&challenge, Some(BOUND_AUTH_CHALLENGE_SCHEME), server).unwrap();
+    assert_eq!(hex::encode(signing), s(&v["signing_bytes"]));
+
+    let id = Identity::from_seed_hex(s(&v["inputs"]["signer_seed"])).unwrap();
+    let sig = id
+        .sign_challenge(
+            s(&v["inputs"]["challenge"]),
+            Some(BOUND_AUTH_CHALLENGE_SCHEME),
+            server,
+        )
         .unwrap();
     assert_eq!(sig, s(&v["signature"]));
 }

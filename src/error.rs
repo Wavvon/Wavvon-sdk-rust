@@ -36,6 +36,8 @@ pub enum AuthError {
     UnknownScheme(Option<String>),
     #[error("challenge is not hex")]
     ChallengeNotHex,
+    #[error("challenge is {0} bytes, expected 32")]
+    BadChallengeLength(usize),
     #[error("seed must be 32 bytes of hex")]
     BadSeed,
 }
