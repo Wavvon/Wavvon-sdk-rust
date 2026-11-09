@@ -59,7 +59,7 @@ async fn challenge(State(m): State<Shared>) -> Response {
     if take_one(&m.challenge_429s) {
         return StatusCode::TOO_MANY_REQUESTS.into_response();
     }
-    Json(json!({ "challenge": "00".repeat(32), "scheme": "tagged-v1" })).into_response()
+    Json(json!({ "challenge": "00".repeat(32), "scheme": "tagged-v2" })).into_response()
 }
 
 async fn verify(State(m): State<Shared>, Json(body): Json<Value>) -> Response {
