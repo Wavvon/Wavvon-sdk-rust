@@ -17,7 +17,7 @@ same. Run `rustup update stable` first; toolchain skew breaks clippy.
 - `src/generated/` is progenitor output from Wavvon-docs `openapi.yaml`. **Never edit by hand.** `SPEC_COMMIT` holds
   the docs commit. Regenerate with `cargo xtask generate [docs] [--ref <ref>]`.
 - `xtask/` is the generator. The only in-memory spec change left drops the multipart operations
-  (`POST /channels/{id}/upload`, `POST /soundboard`), which progenitor cannot generate; it prints what it dropped.
+  (`POST /channels/{id}/upload`, `POST /stickers/packs/{id}/stickers`, `POST /soundboard`), which progenitor cannot generate; it prints what it dropped.
   A spec gap belongs in Wavvon-docs, not in a new patch here.
 - `src/session.rs`: the bearer token shared with the generated client (its pre-hook).
 - `src/client.rs`, `src/ws.rs`: session, retry, re-auth, paging, registration, the WebSocket task.
@@ -42,10 +42,13 @@ same. Run `rustup update stable` first; toolchain skew breaks clippy.
 
 ## Facts that cost time
 
+- `tagged-v2` (Wavvon-server#294) signs the hub key from `/info`, never one from the challenge response. Its bytes
+  are mirrored in `src/auth.rs` because `wavvon-identity` 0.4.0 (which has `bound_auth_challenge_signing_bytes`) is
+  not on crates.io yet; once it is, bump the dependency and call it instead.
 - The challenge is **hex**: decode it and sign the bytes. The OpenAPI text saying "UTF-8 bytes of the string" is stale.
 - `hub_event` and `resume` work only on a socket whose identity had an app profile when it connected: register first.
 - The hub answers `app_join` itself; the host side is `app_announce`/`app_dismiss` plus `mini_app_message`.
-- The hub never writes `GET /me/events` today; the polling calls follow the spec but nothing here relies on them.
+- `GET /me/events` reads the audit log (Wavvon-server#183): `hub_event` envelopes after a `seq` cursor, 410 outside the 72-hour window, no ack.
 - A fresh hub has no channel; the smoke example creates one.
 
 ## Releasing

@@ -21,18 +21,23 @@ pub enum Error {
     Decode(String),
     #[error("the event stream is closed")]
     Closed,
+    /// A poll cursor is older than the hub's 72-hour window: events after it
+    /// were missed. Resynchronise from REST, then poll without a cursor.
+    #[error("events before seq {earliest_seq} are outside the hub's replay window")]
+    ReplayUnavailable { earliest_seq: i64, earliest_at: i64 },
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum AuthError {
-    #[error("hub named an unknown challenge scheme `{0}`")]
-    UnknownScheme(String),
+    /// The hub named no scheme, or one this SDK does not sign. Never answered raw.
+    #[error("hub named no supported challenge scheme (got {0:?})")]
+    UnknownScheme(Option<String>),
     #[error("challenge is not hex")]
     ChallengeNotHex,
-    #[error("an untagged challenge must be exactly 32 bytes, got {0}")]
-    RawChallengeLength(usize),
+    #[error("challenge is {0} bytes, expected 32")]
+    BadChallengeLength(usize),
     #[error("seed must be 32 bytes of hex")]
     BadSeed,
 }

@@ -54,13 +54,13 @@ A fuller bot with a slash command is `examples/echo_bot.rs`.
 | Piece | Where |
 |---|---|
 | Generated REST client, whole API (`client.rest()`; wrap in `client.call(..)` for retry and re-auth) | `generated`, `Client::call` |
-| Auth: `tagged-v1` signing, raw only for exactly 32 bytes, unknown scheme refused | `auth` |
+| Auth: `tagged-v2` signing bound to the hub key from `/info` (`tagged-v1` for older hubs); a missing or unknown scheme is refused | `auth` |
 | Retry: capped exponential backoff with jitter on 429/5xx/408/network; transient is `Error::Transient`, never an answer | `retry`, `Client` |
 | Re-auth on 401, observable `ConnectionState` | `Client::state` |
 | Capabilities from `GET /info`, typed `Error::UnsupportedByHub` | `caps`, `Client::require` |
 | Keyset pager as a `Stream` (`Client::users`) | `pager` |
 | WebSocket loop: seq tracking, `resume`, `replay_unavailable` surfaced, `Event::Unknown { raw }` | `Client::events` |
-| HTTP polling `GET`/`DELETE /me/events` | `Client::poll_events`, `ack_events` |
+| HTTP polling `GET /me/events` | `Client::poll_events` (cursor = last `seq`) |
 | App registration | `Client::put_app_profile`, `put_app_commands`, `put_app_subscriptions` |
 | Slash/component dispatch verifier, invocation decoding, reply shapes | `webhooks::verify_dispatch`, `apps` |
 | Outgoing-webhook verifier (HKDF + HMAC) | `webhooks::verify_outgoing_webhook` |
@@ -101,7 +101,7 @@ the sender names proves nothing. Verify the raw bytes before parsing. The 300 s 
 `../../server/crates/identity/wire-vectors.json`. A missing file fails when `CI` is set and prints a loud skip otherwise.
 
 Pin: the CI workflow fetches the vectors at `WIRE_VECTORS_REF` (`.github/workflows/ci.yml`), currently Wavvon-server
-`eb11d75657ee8362dd42a7982fc5b13a3dcc4e68`; bump it in the PR that takes new vectors. The generated REST code is pinned to the Wavvon-docs commit in `src/generated/SPEC_COMMIT`.
+`78ff4aab3ba905ef4480d02d47f24d63762cc697`; bump it in the PR that takes new vectors. The generated REST code is pinned to the Wavvon-docs commit in `src/generated/SPEC_COMMIT`.
 
 ## Regenerating the REST client
 

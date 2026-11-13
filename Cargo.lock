@@ -2313,6 +2313,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6c140620e7ffbb22c2dee59cafe6084a59b5ffc27a8859a5f0d494b5d52b6be"
 
 [[package]]
+name = "uuid"
+version = "1.29.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bed99139f7dac9b5cfe5f17be4d66dc7079a34dee1d74bcc77217119240e267c"
+dependencies = [
+ "js-sys",
+ "serde_core",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2443,7 +2454,7 @@ dependencies = [
 
 [[package]]
 name = "wavvon-sdk"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "axum",
  "base64 0.23.1",
@@ -2453,6 +2464,7 @@ dependencies = [
  "hmac 0.13.0",
  "progenitor-client",
  "rand 0.10.3",
+ "regress",
  "reqwest",
  "serde",
  "serde_json",
@@ -2460,6 +2472,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-tungstenite 0.30.0",
+ "uuid",
  "wavvon-identity",
 ]
 

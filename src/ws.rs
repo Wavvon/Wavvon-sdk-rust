@@ -24,6 +24,19 @@ enum Ended {
     Lost,
 }
 
+/// A single-use ticket keeps the session token out of URLs, and so out of
+/// proxy logs. An older hub only takes the token, and a ticket request that
+/// fails falls back to it: the socket then answers 401 and the stream
+/// re-authenticates as before.
+async fn socket_query(client: &Client, token: Option<&str>) -> String {
+    if client.capabilities().has("ws.ticket") {
+        if let Ok(res) = client.rest().create_ws_ticket().send().await {
+            return format!("ticket={}", res.into_inner().ticket);
+        }
+    }
+    format!("token={}", token.unwrap_or_default())
+}
+
 pub(crate) async fn run(
     client: Client,
     out: mpsc::Sender<Result<Event>>,
@@ -35,9 +48,9 @@ pub(crate) async fn run(
     loop {
         let token = client.token();
         let url = format!(
-            "{}/ws?token={}",
+            "{}/ws?{}",
             client.base().replacen("http", "ws", 1),
-            token.clone().unwrap_or_default()
+            socket_query(&client, token.as_deref()).await
         );
         match tokio_tungstenite::connect_async(url).await {
             Ok((ws, _)) => {

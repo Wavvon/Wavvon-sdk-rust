@@ -59,7 +59,7 @@ async fn challenge(State(m): State<Shared>) -> Response {
     if take_one(&m.challenge_429s) {
         return StatusCode::TOO_MANY_REQUESTS.into_response();
     }
-    Json(json!({ "challenge": "00".repeat(32), "scheme": "tagged-v1" })).into_response()
+    Json(json!({ "challenge": "00".repeat(32), "scheme": "tagged-v2" })).into_response()
 }
 
 async fn verify(State(m): State<Shared>, Json(body): Json<Value>) -> Response {
@@ -84,6 +84,14 @@ async fn me_app(State(m): State<Shared>, h: HeaderMap) -> Response {
 
 async fn always_503() -> StatusCode {
     StatusCode::SERVICE_UNAVAILABLE
+}
+
+async fn me_events(Query(q): Query<HashMap<String, String>>) -> Response {
+    if q.get("cursor").map(String::as_str) == Some("1") {
+        let gone = json!({"type": "replay_unavailable", "earliest_seq": 40, "earliest_at": 9});
+        return (StatusCode::GONE, Json(gone)).into_response();
+    }
+    StatusCode::SERVICE_UNAVAILABLE.into_response()
 }
 
 async fn post_message(State(m): State<Shared>, h: HeaderMap, Json(b): Json<Value>) -> Response {
@@ -189,7 +197,7 @@ async fn spawn(caps: &[&'static str], challenge_429s: u32, me_app_503s: u32) -> 
         .route("/auth/verify", post(verify))
         .route("/me/app", get(me_app))
         .route("/me/app/profile", axum::routing::put(always_503))
-        .route("/me/events", get(always_503))
+        .route("/me/events", get(me_events))
         .route("/channels/{id}/messages", post(post_message))
         .route("/users", get(users))
         .route("/ws", get(ws))
@@ -229,9 +237,26 @@ async fn a_429_on_the_challenge_is_retried_not_returned() {
 async fn a_hub_that_never_answers_is_transient_never_an_answer() {
     let (url, _) = spawn(&["apps.register"], 0, 0).await;
     let client = connect(&url).await;
-    let err = client.poll_events(None).await.unwrap_err();
+    let err = client.poll_events(None, None).await.unwrap_err();
     assert!(
         matches!(err, Error::Transient { attempts: 4, .. }),
+        "{err:?}"
+    );
+}
+
+#[tokio::test]
+async fn a_poll_cursor_outside_the_window_is_replay_unavailable() {
+    let (url, _) = spawn(&["apps.register"], 0, 0).await;
+    let client = connect(&url).await;
+    let err = client.poll_events(Some(1), None).await.unwrap_err();
+    assert!(
+        matches!(
+            err,
+            Error::ReplayUnavailable {
+                earliest_seq: 40,
+                earliest_at: 9
+            }
+        ),
         "{err:?}"
     );
 }
