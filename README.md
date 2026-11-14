@@ -1,5 +1,11 @@
 # wavvon-sdk (Rust)
 
+[![crates.io](https://img.shields.io/crates/v/wavvon-sdk)](https://crates.io/crates/wavvon-sdk)
+[![docs.rs](https://img.shields.io/docsrs/wavvon-sdk)](https://docs.rs/wavvon-sdk)
+[![CI](https://github.com/Wavvon/Wavvon-sdk-rust/actions/workflows/ci.yml/badge.svg)](https://github.com/Wavvon/Wavvon-sdk-rust/actions/workflows/ci.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+[![MSRV](https://img.shields.io/badge/rust-1.88%2B-orange?logo=rust)](Cargo.toml)
+
 Tier 1 of the Wavvon SDK: write a **bot or app** that talks to a [Wavvon](https://github.com/Wavvon) hub.
 A program is a client like any other: a keypair, the same challenge, the same session. There is no bot account.
 
