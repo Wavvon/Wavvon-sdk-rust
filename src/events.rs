@@ -91,6 +91,20 @@ pub enum Event {
     },
     /// A player's mini-app session talking to this program (`from_pubkey` set).
     MiniAppMessage(MiniAppMessage),
+    /// A DM arrived. For an encrypted one `content` is the placeholder
+    /// `[encrypted]`: fetch and decrypt with [`Dms::poll`](crate::Dms::poll).
+    Dm {
+        conversation_id: String,
+        sender: String,
+        sender_name: Option<String>,
+        content: String,
+        timestamp: i64,
+    },
+    DmMemberChanged {
+        conversation_id: String,
+        added: Vec<String>,
+        removed: Vec<String>,
+    },
     Unknown {
         raw: Value,
     },
@@ -162,6 +176,24 @@ impl Event {
             channel_id: String,
         }
 
+        #[derive(Deserialize)]
+        struct Dm {
+            conversation_id: String,
+            sender: String,
+            #[serde(default)]
+            sender_name: Option<String>,
+            content: String,
+            timestamp: i64,
+        }
+        #[derive(Deserialize)]
+        struct DmMemberChanged {
+            conversation_id: String,
+            #[serde(default)]
+            added: Vec<String>,
+            #[serde(default)]
+            removed: Vec<String>,
+        }
+
         fn parse<T: serde::de::DeserializeOwned>(v: &Value) -> Option<T> {
             serde_json::from_value(v.clone()).ok()
         }
@@ -207,6 +239,20 @@ impl Event {
                 app_id: m.app_id,
                 channel_id: m.channel_id,
             }),
+            Some("dm") => parse::<Dm>(&raw).map(|m| Event::Dm {
+                conversation_id: m.conversation_id,
+                sender: m.sender,
+                sender_name: m.sender_name,
+                content: m.content,
+                timestamp: m.timestamp,
+            }),
+            Some("dm_member_changed") => {
+                parse::<DmMemberChanged>(&raw).map(|m| Event::DmMemberChanged {
+                    conversation_id: m.conversation_id,
+                    added: m.added,
+                    removed: m.removed,
+                })
+            }
             Some("mini_app_message") => parse::<MiniAppMessage>(&raw).map(Event::MiniAppMessage),
             _ => None,
         };

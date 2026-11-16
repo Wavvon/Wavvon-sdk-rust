@@ -25,8 +25,9 @@ futures = "0.3"
 tokio = { version = "1.53.3", features = ["rt", "time", "sync", "macros", "net"] }
 tokio-tungstenite = { version = "0.30.0", default-features = false, features = ["connect", "rustls-tls-webpki-roots"] }
 ed25519-dalek = "3.0.0"
-wavvon-identity = { version = "0.1.0", git = "https://github.com/Wavvon/Wavvon-server", rev = "14918c02314c4808a95514181e0e00bb2cae2e72" }
+wavvon-identity = { version = "0.6.0", git = "https://github.com/Wavvon/Wavvon-server", rev = "0af4f86a7a5b8087064f8b00f2b65bbb579e3797" }
 hex = "0.4.3"
+x25519-dalek = "2"
 hmac = "0.13.0"
 sha2 = "0.11.1"
 base64 = "0.23.1"

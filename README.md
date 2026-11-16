@@ -71,6 +71,8 @@ A fuller bot with a slash command is `examples/echo_bot.rs`.
 | Slash/component dispatch verifier, invocation decoding, reply shapes | `webhooks::verify_dispatch`, `apps` |
 | Outgoing-webhook verifier (HKDF + HMAC) | `webhooks::verify_outgoing_webhook` |
 | Mini-app host side | `EventSender::announce_mini_app`, `send_to_player`, `Event::MiniAppMessage` |
+| E2E DMs: publish the DH key, send double-ratchet v2, read v2 and v1, group sender keys, signature checks incl. `signer_cert`; never a silent plaintext fallback | `Client::publish_dh_key`, `Client::dms()` |
+| DH pins, ratchet sessions and group chains behind a store trait (in-memory default) | `StateStore`, `ConnectOptions::store` |
 
 ### Capabilities each feature needs
 
@@ -79,9 +81,26 @@ A fuller bot with a slash command is `examples/echo_bot.rs`.
 | `put_app_profile`, `put_app_commands`, `put_app_subscriptions`, `app_registration` | `apps.register` (and a role holding it) |
 | `Client::users` paging | `list.cursor` |
 | Other `limit` + `cursor` lists (via the generated client) | `list.cursor.lists` |
+| Signed membership changes in `Dms::add_members` / `leave` | `dms.group.signedmembers` |
+| v2 signed plaintext in `Dms::send_plaintext` | `dms.plaintext.v2` |
 | A hub that sends `X-Wavvon-Signature-V1` (the verifiers require it) | `webhooks.signedtimestamp` |
 
 The SDK never compares hub versions. A missing string is `Error::UnsupportedByHub`.
+
+## Encrypted DMs
+
+```rust
+client.publish_dh_key().await?;            // once per hub; nobody can encrypt to you without it
+let dms = client.dms();
+let conv = dms.create_conversation(&[peer]).await?;
+dms.send_text(&conv.id, "hello").await?;   // RecipientHasNoKey / DhKeyChanged, never plaintext
+for m in dms.poll(&conv.id).await? { /* m.content is per message */ }
+```
+
+`Event::Dm` says a message arrived; `poll` fetches and decrypts it. A ratchet cannot read what it sent itself, and a
+key is spent once: the SDK keeps decrypted text in a bounded in-memory cache so history can be read again. State
+lives in a `StateStore` (memory by default): lose it and the conversations it belongs to stop being readable.
+Examples: `examples/dm_echo.rs`, `examples/smoke_dm.rs`.
 
 ## Webhook verification (any framework)
 
@@ -107,7 +126,7 @@ the sender names proves nothing. Verify the raw bytes before parsing. The 300 s 
 `../../server/crates/identity/wire-vectors.json`. A missing file fails when `CI` is set and prints a loud skip otherwise.
 
 Pin: the CI workflow fetches the vectors at `WIRE_VECTORS_REF` (`.github/workflows/ci.yml`), currently Wavvon-server
-`78ff4aab3ba905ef4480d02d47f24d63762cc697`; bump it in the PR that takes new vectors. The generated REST code is pinned to the Wavvon-docs commit in `src/generated/SPEC_COMMIT`.
+`0af4f86a7a5b8087064f8b00f2b65bbb579e3797`; bump it in the PR that takes new vectors. The generated REST code is pinned to the Wavvon-docs commit in `src/generated/SPEC_COMMIT`.
 
 ## Regenerating the REST client
 
@@ -129,5 +148,5 @@ invocation.
 
 ## Not here
 
-Tier 2 (E2E DMs, multi-device, home hubs, voice) is a later layer. `/auth/*` always goes to the hub itself, not to a
+Tier 2 (multi-device, home hubs) is a later layer; voice is the next release of this SDK. `/auth/*` always goes to the hub itself, not to a
 farm in front of it.

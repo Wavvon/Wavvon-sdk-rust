@@ -33,6 +33,38 @@ impl Identity {
         hex::encode(self.key.verifying_key().to_bytes())
     }
 
+    /// The Ed25519 seed, for wavvon-identity calls that take it. Crate-private:
+    /// the seed never leaves the process.
+    pub(crate) fn seed(&self) -> [u8; 32] {
+        self.key.to_bytes()
+    }
+
+    /// Hex Ed25519 signature over `message`.
+    pub(crate) fn sign_hex(&self, message: &[u8]) -> String {
+        hex::encode(self.key.sign(message).to_bytes())
+    }
+
+    /// The X25519 scalar derived from the seed: SHA-512(seed)[0..32], clamped
+    /// (vector `master_dh_pubkey`).
+    pub(crate) fn dh_secret(&self) -> [u8; 32] {
+        use sha2::{Digest, Sha512};
+        let hash = Sha512::digest(self.seed());
+        let mut scalar = [0u8; 32];
+        scalar.copy_from_slice(&hash[..32]);
+        scalar[0] &= 248;
+        scalar[31] &= 127;
+        scalar[31] |= 64;
+        scalar
+    }
+
+    /// The X25519 public key peers wrap voice keys and DMs to.
+    pub fn dh_public_key_hex(&self) -> String {
+        hex::encode(x25519_dalek::x25519(
+            self.dh_secret(),
+            x25519_dalek::X25519_BASEPOINT_BYTES,
+        ))
+    }
+
     /// Answers `POST /auth/challenge`: returns the hex signature for
     /// `POST /auth/verify`. `server_pubkey` is the key the server's own
     /// `GET /info` presented, never one from the challenge response.
@@ -73,17 +105,12 @@ pub fn challenge_signing_bytes(
     if challenge.len() != AUTH_CHALLENGE_LEN {
         return Err(AuthError::BadChallengeLength(challenge.len()));
     }
-    if !bound {
-        return Ok(wavvon_identity::auth_challenge_signing_bytes(challenge));
-    }
-    // Mirrors wavvon_identity::bound_auth_challenge_signing_bytes (0.4.0),
-    // which is not on crates.io yet; the conformance vector pins the bytes.
-    let key = server_pubkey.as_bytes();
-    let mut buf = b"wavvon/auth-challenge/v2\0".to_vec();
-    buf.extend_from_slice(&(key.len() as u32).to_le_bytes());
-    buf.extend_from_slice(key);
-    buf.extend_from_slice(challenge);
-    Ok(buf)
+    let bytes = if bound {
+        wavvon_identity::bound_auth_challenge_signing_bytes(server_pubkey, challenge)
+    } else {
+        wavvon_identity::auth_challenge_signing_bytes(challenge)
+    };
+    bytes.map_err(|_| AuthError::BadChallengeLength(challenge.len()))
 }
 
 #[cfg(test)]

@@ -24,6 +24,8 @@ same. Run `rustup update stable` first; toolchain skew breaks clippy.
 - `src/auth.rs`, `src/webhooks.rs`: thin wrappers over `wavvon-identity` (Wavvon-server `crates/identity`,
   Apache-2.0 since 2026-10-18, a git dependency pinned by rev until it is on crates.io) for the signing bytes, the
   webhook key and HMAC, and the header names. Bump the rev to pick up a wire-format change.
+- `src/dm.rs`, `src/dh.rs`, `src/store.rs`: E2E DMs (ratchet, sender keys), the DH key (publish, verify, pin) and the
+  state store trait. `tests/conformance_dm_voice.rs` asserts the DM and voice vectors.
 - `tests/conformance.rs`: byte equality against `wire-vectors.json` (Wavvon-server owns it). Never copy the file in.
 - `tests/session_flow.rs`: retry, re-auth and resume against an in-process fake hub.
   `examples/smoke.rs` is the real-hub check.
@@ -42,9 +44,8 @@ same. Run `rustup update stable` first; toolchain skew breaks clippy.
 
 ## Facts that cost time
 
-- `tagged-v2` (Wavvon-server#294) signs the hub key from `/info`, never one from the challenge response. Its bytes
-  are mirrored in `src/auth.rs` because `wavvon-identity` 0.4.0 (which has `bound_auth_challenge_signing_bytes`) is
-  not on crates.io yet; once it is, bump the dependency and call it instead.
+- `tagged-v2` (Wavvon-server#294) signs the hub key from `/info`, never one from the challenge response;
+  `wavvon_identity::bound_auth_challenge_signing_bytes` builds the bytes.
 - The challenge is **hex**: decode it and sign the bytes. The OpenAPI text saying "UTF-8 bytes of the string" is stale.
 - `hub_event` and `resume` work only on a socket whose identity had an app profile when it connected: register first.
 - The hub answers `app_join` itself; the host side is `app_announce`/`app_dismiss` plus `mini_app_message`.

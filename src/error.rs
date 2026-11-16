@@ -21,6 +21,26 @@ pub enum Error {
     Decode(String),
     #[error("the event stream is closed")]
     Closed,
+    /// The peer has published no DH key on this hub, so nothing can be
+    /// encrypted or wrapped to it. Never sent in the clear instead.
+    #[error("{pubkey} has published no DH key on this hub")]
+    RecipientHasNoKey { pubkey: String },
+    /// The peer's DH key differs from the one pinned on first use. Nothing is
+    /// encrypted to it until the program accepts it
+    /// ([`Client::accept_dh_key`](crate::Client::accept_dh_key)).
+    #[error("DH key of {pubkey} changed (pinned {pinned}, hub now has {fetched})")]
+    DhKeyChanged {
+        pubkey: String,
+        pinned: String,
+        fetched: String,
+    },
+    /// The hub holds a DH record for `pubkey` that `pubkey` did not sign.
+    #[error("DH key record for {pubkey} is not signed by its owner")]
+    DhKeyUnsigned { pubkey: String },
+    #[error(transparent)]
+    Dm(#[from] DmError),
+    #[error(transparent)]
+    Store(#[from] crate::store::StoreError),
     /// A poll cursor is older than the hub's 72-hour window: events after it
     /// were missed. Resynchronise from REST, then poll without a cursor.
     #[error("events before seq {earliest_seq} are outside the hub's replay window")]
@@ -28,6 +48,33 @@ pub enum Error {
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
+
+/// Why one DM could not be read or sent. Per message: a program keeps going.
+#[derive(Debug, thiserror::Error)]
+pub enum DmError {
+    /// The envelope is not signed by the member the hub names as its sender
+    /// (directly or through a cert that member issued). Not decrypted.
+    #[error("envelope is not signed by its sender")]
+    NotSignedBySender,
+    /// A ratchet cannot read what it sent itself. Keeping a copy is the
+    /// program's business.
+    #[error("this program sent the message; a ratchet cannot decrypt its own output")]
+    OwnMessage,
+    #[error("malformed envelope: {0}")]
+    Malformed(String),
+    #[error("decryption failed")]
+    DecryptionFailed,
+    #[error("no ratchet session for this conversation")]
+    NoSession,
+    #[error("more than 1000 skipped messages")]
+    TooManySkipped,
+    #[error("no sender key from {sender} at version {version}")]
+    KeyNotFound { sender: String, version: u32 },
+    #[error("the sender's chain was already advanced past this message")]
+    ChainAdvancedPastMessage,
+    #[error("{0}")]
+    Crypto(String),
+}
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum AuthError {

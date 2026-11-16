@@ -19,12 +19,16 @@ use crate::generated;
 use crate::pager::pager;
 use crate::retry::{classify, RetryPolicy, Verdict};
 use crate::session::Session;
+use crate::store::{MemoryStore, StateStore};
 
 #[derive(Clone, Debug, Default)]
 pub struct ConnectOptions {
     /// Spent only when the hub is `invite_only` and this identity is new.
     pub invite_code: Option<String>,
     pub retry: RetryPolicy,
+    /// Where DH pins, DM ratchet sessions and group chains live. In memory
+    /// when unset, so a restart forgets them (see [`StateStore`]).
+    pub store: Option<Arc<dyn StateStore>>,
 }
 
 /// What a program can observe about its session.
@@ -64,6 +68,8 @@ struct Inner {
     info: RwLock<(String, Capabilities)>,
     reauth: Mutex<()>,
     state: watch::Sender<ConnectionState>,
+    pub(crate) store: Arc<dyn StateStore>,
+    pub(crate) dm: crate::dm::Shared,
 }
 
 /// A session with one hub. Cheap to clone; clones share the session.
@@ -103,11 +109,27 @@ impl Client {
                 info: RwLock::new((String::new(), Capabilities::default())),
                 reauth: Mutex::new(()),
                 state,
+                store: opts
+                    .store
+                    .unwrap_or_else(|| Arc::new(MemoryStore::default())),
+                dm: crate::dm::Shared::default(),
             }),
         };
         client.refresh_info().await?;
         client.login().await?;
         Ok(client)
+    }
+
+    pub(crate) fn identity(&self) -> &Identity {
+        &self.inner.identity
+    }
+
+    pub(crate) fn store(&self) -> &dyn StateStore {
+        self.inner.store.as_ref()
+    }
+
+    pub(crate) fn dm_shared(&self) -> &crate::dm::Shared {
+        &self.inner.dm
     }
 
     pub fn public_key(&self) -> String {
@@ -253,7 +275,7 @@ impl Client {
 
     /// One request with the retry rules. A 429 or 5xx never comes back as an
     /// answer; a 401 on an authenticated call re-authenticates once.
-    async fn execute(
+    pub(crate) async fn execute(
         &self,
         method: Method,
         path: &str,
@@ -302,7 +324,7 @@ impl Client {
         })
     }
 
-    async fn json<T: DeserializeOwned>(
+    pub(crate) async fn json<T: DeserializeOwned>(
         &self,
         method: Method,
         path: &str,
@@ -659,7 +681,7 @@ fn to_value<T: Serialize>(v: &T) -> Result<Value> {
     serde_json::to_value(v).map_err(|e| Error::Request(e.to_string()))
 }
 
-fn encode(segment: &str) -> String {
+pub(crate) fn encode(segment: &str) -> String {
     segment
         .bytes()
         .map(|b| match b {
@@ -671,7 +693,7 @@ fn encode(segment: &str) -> String {
         .collect()
 }
 
-async fn ok_or_status(resp: reqwest::Response) -> Result<reqwest::Response> {
+pub(crate) async fn ok_or_status(resp: reqwest::Response) -> Result<reqwest::Response> {
     if resp.status().is_success() {
         return Ok(resp);
     }
