@@ -9,6 +9,8 @@ pub mod auth;
 pub mod axum_handler;
 pub mod caps;
 mod client;
+mod dh;
+pub mod dm;
 pub mod error;
 pub mod events;
 #[rustfmt::skip]
@@ -17,6 +19,7 @@ pub mod generated;
 pub mod pager;
 pub mod retry;
 pub mod session;
+pub mod store;
 pub mod webhooks;
 mod ws;
 
@@ -25,5 +28,7 @@ pub use caps::Capabilities;
 pub use client::{
     Client, ConnectOptions, ConnectionState, EventSender, EventStream, EventsOptions,
 };
-pub use error::{Error, Result};
+pub use dm::{DmMessage, DmPlaintext, Dms};
+pub use error::{DmError, Error, Result};
 pub use events::{ClientMessage, Event, HubEvent};
+pub use store::{MemoryStore, StateStore};

@@ -216,6 +216,7 @@ fn fast() -> ConnectOptions {
             base: Duration::from_millis(5),
             cap: Duration::from_millis(20),
         },
+        store: None,
     }
 }
 
