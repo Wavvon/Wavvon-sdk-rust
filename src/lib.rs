@@ -20,6 +20,8 @@ pub mod pager;
 pub mod retry;
 pub mod session;
 pub mod store;
+#[cfg(feature = "voice")]
+pub mod voice;
 pub mod webhooks;
 mod ws;
 

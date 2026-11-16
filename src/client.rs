@@ -628,6 +628,12 @@ impl EventSender {
         self.tx.send(msg).await.map_err(|_| Error::Closed)
     }
 
+    /// Queues without waiting, for callers that cannot await. A full queue
+    /// is `Closed` and the message is not sent.
+    pub fn try_send(&self, msg: ClientMessage) -> Result<()> {
+        self.tx.try_send(msg).map_err(|_| Error::Closed)
+    }
+
     /// Needed only for channels created after the socket connected.
     pub async fn subscribe(&self, channel_id: &str) -> Result<()> {
         self.send(ClientMessage::Subscribe {

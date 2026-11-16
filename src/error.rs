@@ -41,6 +41,8 @@ pub enum Error {
     Dm(#[from] DmError),
     #[error(transparent)]
     Store(#[from] crate::store::StoreError),
+    #[error(transparent)]
+    Voice(#[from] VoiceError),
     /// A poll cursor is older than the hub's 72-hour window: events after it
     /// were missed. Resynchronise from REST, then poll without a cursor.
     #[error("events before seq {earliest_seq} are outside the hub's replay window")]
@@ -74,6 +76,37 @@ pub enum DmError {
     ChainAdvancedPastMessage,
     #[error("{0}")]
     Crypto(String),
+}
+
+/// Why a voice call could not proceed.
+#[derive(Debug, thiserror::Error)]
+pub enum VoiceError {
+    /// `voice_joined` carried no `voice_wt_url`: a hub older than voice
+    /// transport v2.
+    #[error("the hub offers no WebTransport voice endpoint")]
+    NoTransport,
+    /// Talk power is below the channel's threshold, so the relay would drop
+    /// every datagram. Lifted by `VoiceEvent::TalkGranted`.
+    #[error("may_speak is false in this channel")]
+    MayNotSpeak,
+    /// Anything but exactly 20 ms of Opus: the desktop decoder cannot play it.
+    #[error("opus packet is not a single 20 ms frame: {0}")]
+    BadFrame(String),
+    #[error("a {0}-byte packet does not fit a datagram")]
+    PacketTooLarge(usize),
+    /// After `leave`, or between a dropped socket and the rejoin.
+    #[error("not in a voice room right now")]
+    NotInRoom,
+    #[error("the hub refused: {0}")]
+    Refused(String),
+    #[error("zone {0} is not in this room")]
+    UnknownZone(String),
+    #[error("position has {got} coordinates, the zone takes {want}")]
+    BadPosition { got: usize, want: usize },
+    #[error("transport: {0}")]
+    Transport(String),
+    #[error("opus codec: {0}")]
+    Codec(String),
 }
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]

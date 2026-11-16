@@ -284,6 +284,37 @@ pub enum ClientMessage {
         #[serde(skip_serializing_if = "Option::is_none")]
         to_pubkey: Option<String>,
     },
+    #[serde(rename = "voice_join")]
+    VoiceJoin { channel_id: String },
+    #[serde(rename = "voice_leave")]
+    VoiceLeave { channel_id: String },
+    #[serde(rename = "voice_speaking")]
+    VoiceSpeaking { channel_id: String, speaking: bool },
+    #[serde(rename = "voice_key_offer")]
+    VoiceKeyOffer {
+        channel_id: String,
+        bundles: Vec<VoiceKeyBundle>,
+    },
+    #[serde(rename = "voice_position_update")]
+    VoicePositionUpdate { zone_id: String, position: Vec<f64> },
+    #[serde(rename = "voice_zone_create")]
+    VoiceZoneCreate {
+        zone_id: String,
+        name: String,
+        coordinate_system: String,
+        attenuation: Value,
+        auth_mode: String,
+    },
+    #[serde(rename = "voice_zone_destroy")]
+    VoiceZoneDestroy { zone_id: String },
+}
+
+/// One wrapped voice sender key for one recipient (`voice_key_offer`).
+#[derive(Clone, Debug, Serialize)]
+pub struct VoiceKeyBundle {
+    pub recipient_pubkey: String,
+    pub ciphertext_hex: String,
+    pub nonce_hex: String,
 }
 
 #[cfg(test)]

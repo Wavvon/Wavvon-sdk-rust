@@ -22,7 +22,9 @@ Not published yet. Use a path or git dependency:
 wavvon-sdk = { git = "https://github.com/Wavvon/Wavvon-sdk-rust", features = ["axum"] }
 ```
 
-Feature `axum` adds a ready webhook endpoint (`wavvon_sdk::axum_handler`).
+Feature `axum` adds a ready webhook endpoint (`wavvon_sdk::axum_handler`). Feature `voice` adds voice (WebTransport,
+Opus passthrough, no C dependency); `voice-pcm` adds `send_pcm` and decoded PCM on receive (links libopus through
+`audiopus`, which needs a C compiler and cmake).
 
 ## Quick start
 
@@ -71,6 +73,7 @@ A fuller bot with a slash command is `examples/echo_bot.rs`.
 | Slash/component dispatch verifier, invocation decoding, reply shapes | `webhooks::verify_dispatch`, `apps` |
 | Outgoing-webhook verifier (HKDF + HMAC) | `webhooks::verify_outgoing_webhook` |
 | Mini-app host side | `EventSender::announce_mini_app`, `send_to_player`, `Event::MiniAppMessage` |
+| Voice: join, 20 ms-paced `send_opus` / `send_pcm`, mute, deafen, proximity, key rotation, rejoin on a dropped socket (features `voice`, `voice-pcm`) | `Client::join_voice`, `voice::Voice` |
 | E2E DMs: publish the DH key, send double-ratchet v2, read v2 and v1, group sender keys, signature checks incl. `signer_cert`; never a silent plaintext fallback | `Client::publish_dh_key`, `Client::dms()` |
 | DH pins, ratchet sessions and group chains behind a store trait (in-memory default) | `StateStore`, `ConnectOptions::store` |
 
@@ -81,11 +84,28 @@ A fuller bot with a slash command is `examples/echo_bot.rs`.
 | `put_app_profile`, `put_app_commands`, `put_app_subscriptions`, `app_registration` | `apps.register` (and a role holding it) |
 | `Client::users` paging | `list.cursor` |
 | Other `limit` + `cursor` lists (via the generated client) | `list.cursor.lists` |
+| `join_voice` | `channels.voice` (and a `voice_wt_url` in `voice_joined`) |
 | Signed membership changes in `Dms::add_members` / `leave` | `dms.group.signedmembers` |
 | v2 signed plaintext in `Dms::send_plaintext` | `dms.plaintext.v2` |
 | A hub that sends `X-Wavvon-Signature-V1` (the verifiers require it) | `webhooks.signedtimestamp` |
 
 The SDK never compares hub versions. A missing string is `Error::UnsupportedByHub`.
+
+## Voice
+
+```rust
+let voice = client.join_voice(&channel_id).await?;   // publishes the DH key, joins, opens the audio session
+voice.send_opus(&packet).await?;                      // one 20 ms Opus packet, held to its slot
+while let Some(ev) = voice.next().await {
+    if let VoiceEvent::Audio(frame) = ev? { /* frame.from, frame.opus, frame.pcm (voice-pcm) */ }
+}
+voice.leave().await?;
+```
+
+The SDK carries audio and judges none of it. Refusals are interop facts: a packet that is not exactly 20 ms (desktop
+cannot decode it), `MayNotSpeak` while talk power is missing. Mute and deafen are local; `VoiceEvent::MoveRequested` is
+a request the program may ignore. The room lives on a WebSocket of its own, so `client.events()` does not repeat voice
+messages. Examples: `examples/voice_ogg.rs` (play an Ogg Opus file), `examples/smoke_voice.rs` (real hub).
 
 ## Encrypted DMs
 
@@ -148,5 +168,5 @@ invocation.
 
 ## Not here
 
-Tier 2 (multi-device, home hubs) is a later layer; voice is the next release of this SDK. `/auth/*` always goes to the hub itself, not to a
+Tier 2 (multi-device, home hubs) is a later layer. `/auth/*` always goes to the hub itself, not to a
 farm in front of it.
