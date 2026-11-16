@@ -26,6 +26,7 @@ same. Run `rustup update stable` first; toolchain skew breaks clippy.
   webhook key and HMAC, and the header names. Bump the rev to pick up a wire-format change.
 - `src/dm.rs`, `src/dh.rs`, `src/store.rs`: E2E DMs (ratchet, sender keys), the DH key (publish, verify, pin) and the
   state store trait. `tests/conformance_dm_voice.rs` asserts the DM and voice vectors.
+- `src/voice/` (features `voice`, `voice-pcm`): a program in a voice room; `examples/smoke_voice.rs` is its real-hub check.
 - `tests/conformance.rs`: byte equality against `wire-vectors.json` (Wavvon-server owns it). Never copy the file in.
 - `tests/session_flow.rs`: retry, re-auth and resume against an in-process fake hub.
   `examples/smoke.rs` is the real-hub check.
