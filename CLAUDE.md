@@ -24,6 +24,7 @@ same. Run `rustup update stable` first; toolchain skew breaks clippy.
 - `src/auth.rs`, `src/webhooks.rs`: thin wrappers over `wavvon-identity` (Wavvon-server `crates/identity`,
   Apache-2.0 since 2026-10-18, a git dependency pinned by rev until it is on crates.io) for the signing bytes, the
   webhook key and HMAC, and the header names. Bump the rev to pick up a wire-format change.
+- `src/directory.rs`: signed invite-directory listings (`publish_listing`); the document matches the Wavvon clients' builder byte for byte.
 - `src/dm.rs`, `src/dh.rs`, `src/store.rs`: E2E DMs (ratchet, sender keys), the DH key (publish, verify, pin) and the
   state store trait. `tests/conformance_dm_voice.rs` asserts the DM and voice vectors.
 - `src/voice/` (features `voice`, `voice-pcm`): a program in a voice room; `examples/smoke_voice.rs` is its real-hub check.

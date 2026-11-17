@@ -7,6 +7,9 @@
 pub enum Error {
     #[error("hub answered {status}: {body}")]
     Status { status: u16, body: String },
+    /// A definitive refusal from a directory, with the reason it gave.
+    #[error("directory answered {status}: {reason}")]
+    Directory { status: u16, reason: String },
     #[error("no answer from the hub after {attempts} attempts (last: {last})")]
     Transient { attempts: u32, last: String },
     #[error("this hub does not advertise the `{0}` capability")]

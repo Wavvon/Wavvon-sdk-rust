@@ -39,6 +39,11 @@ impl Identity {
         self.key.to_bytes()
     }
 
+    /// Raw Ed25519 signature over `message`.
+    pub(crate) fn sign(&self, message: &[u8]) -> [u8; 64] {
+        self.key.sign(message).to_bytes()
+    }
+
     /// Hex Ed25519 signature over `message`.
     pub(crate) fn sign_hex(&self, message: &[u8]) -> String {
         hex::encode(self.key.sign(message).to_bytes())
