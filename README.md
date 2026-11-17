@@ -72,6 +72,7 @@ A fuller bot with a slash command is `examples/echo_bot.rs`.
 | App registration | `Client::put_app_profile`, `put_app_commands`, `put_app_subscriptions` |
 | Slash/component dispatch verifier, invocation decoding, reply shapes | `webhooks::verify_dispatch`, `apps` |
 | Outgoing-webhook verifier (HKDF + HMAC) | `webhooks::verify_outgoing_webhook` |
+| Invite-directory listing: publish and remove this program's signed `wavvon.identity` listing | `publish_listing`, `unpublish_listing`, `directory` |
 | Mini-app host side | `EventSender::announce_mini_app`, `send_to_player`, `Event::MiniAppMessage` |
 | Voice: join, 20 ms-paced `send_opus` / `send_pcm`, mute, deafen, proximity, key rotation, rejoin on a dropped socket (features `voice`, `voice-pcm`) | `Client::join_voice`, `voice::Voice` |
 | E2E DMs: publish the DH key, send double-ratchet v2, read v2 and v1, group sender keys, signature checks incl. `signer_cert`; never a silent plaintext fallback | `Client::publish_dh_key`, `Client::dms()` |
@@ -90,6 +91,33 @@ A fuller bot with a slash command is `examples/echo_bot.rs`.
 | A hub that sends `X-Wavvon-Signature-V1` (the verifiers require it) | `webhooks.signedtimestamp` |
 
 The SDK never compares hub versions. A missing string is `Error::UnsupportedByHub`.
+
+## Listing a program in the directory
+
+A Wavvon directory keeps an invite directory: signed `wavvon.identity`
+listings of people and programs that want to be found and invited
+([invite-directory.md](https://github.com/Wavvon/Wavvon-docs/blob/main/docs/invite-directory.md)).
+`publish_listing` builds the document with `pubkey` from the identity (the
+same bytes the Wavvon clients build), signs it and posts it;
+`unpublish_listing` sends the signed delete. The seed never leaves the process.
+
+```rust
+use wavvon_sdk::{publish_listing, unpublish_listing, Contact, Identity, Listing};
+
+let listing = Listing {
+    tagline: "Repeats what you say".into(),
+    tags: vec!["utility".into()],
+    ..Listing::new("Echo", Contact::HomeHub("https://hub.example".into()))
+};
+let url = publish_listing(&identity, &listing, "https://directory.example").await?;
+unpublish_listing(&identity, "https://directory.example").await?;
+```
+
+`Contact` is one route by construction (`HomeHub` or `Endpoint`). `kind`
+defaults to `Program` and `listed_at` to now: the directory keeps only the
+newest listing per key. A refusal is `Error::Directory { status, reason }`;
+429 and 5xx retry and end as `Error::Transient`. See
+[examples/publish_listing.rs](examples/publish_listing.rs).
 
 ## Voice
 

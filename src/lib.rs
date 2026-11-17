@@ -10,6 +10,7 @@ pub mod axum_handler;
 pub mod caps;
 mod client;
 mod dh;
+pub mod directory;
 pub mod dm;
 pub mod error;
 pub mod events;
@@ -30,6 +31,7 @@ pub use caps::Capabilities;
 pub use client::{
     Client, ConnectOptions, ConnectionState, EventSender, EventStream, EventsOptions,
 };
+pub use directory::{publish_listing, unpublish_listing, Contact, Listing};
 pub use dm::{DmMessage, DmPlaintext, Dms};
 pub use error::{DmError, Error, Result};
 pub use events::{ClientMessage, Event, HubEvent};
