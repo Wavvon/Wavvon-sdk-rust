@@ -27,6 +27,7 @@ struct Seen {
     positions: Vec<Vec<f64>>,
     rejoining: usize,
     skipped: Vec<String>,
+    refused: Vec<String>,
 }
 
 fn watch(voice: Voice) -> Arc<Mutex<Seen>> {
@@ -47,6 +48,7 @@ fn watch(voice: Voice) -> Arc<Mutex<Seen>> {
                 }
                 Ok(VoiceEvent::Zones(z)) => s.zones = z.into_iter().map(|z| z.zone_id).collect(),
                 Ok(VoiceEvent::Position { position, .. }) => s.positions.push(position),
+                Ok(VoiceEvent::PositionRefused { reason }) => s.refused.push(reason),
                 Ok(VoiceEvent::Rejoining) => s.rejoining += 1,
                 Ok(VoiceEvent::KeySkipped { public_key, .. }) => s.skipped.push(public_key),
                 Ok(_) => {}
@@ -235,6 +237,29 @@ async fn main() -> Out {
     let n = seen_b2.lock().unwrap().positions.len();
     assert!(n <= 4, "coalescing let {n} of 10 positions through");
     println!("ten positions in 100 ms coalesced to {n}, ending at the last");
+
+    // A position in someone else's creator-only zone is refused, as an event.
+    va.create_zone(
+        "own-zone",
+        "own",
+        "2d",
+        serde_json::json!({}),
+        "creator_only",
+    )
+    .await?;
+    until("B to see the creator-only zone", || {
+        vb2.zones().iter().any(|z| z.zone_id == "own-zone")
+    })
+    .await?;
+    vb2.set_position("own-zone", &[1.0, 1.0])?;
+    until("B to be refused", || {
+        !seen_b2.lock().unwrap().refused.is_empty()
+    })
+    .await?;
+    println!(
+        "B's position was refused: {}",
+        seen_b2.lock().unwrap().refused[0]
+    );
 
     assert!(seen_a.lock().unwrap().skipped.is_empty());
     assert_eq!(seen_a.lock().unwrap().rejoining, 0);
