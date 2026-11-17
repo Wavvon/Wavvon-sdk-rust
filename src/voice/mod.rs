@@ -93,6 +93,11 @@ pub enum VoiceEvent {
         public_key: String,
         position: Vec<f64>,
     },
+    /// The hub refused a position update (unknown zone, or a creator-only
+    /// zone this program did not create). The program decides what to do.
+    PositionRefused {
+        reason: String,
+    },
     /// A moderator gave this program the floor; `may_speak` is now true.
     TalkGranted,
     /// A moderator, or the AFK sweep (`auto`), asks the program to move. The
@@ -591,6 +596,9 @@ async fn rejoin(core: &Arc<Core>, events: &mut EventStream) {
 fn handle_event(core: &Arc<Core>, ev: Event) {
     let me = core.client.public_key();
     match ev {
+        Event::Error { context, message } if context == "voice_position_update" => {
+            core.emit(VoiceEvent::PositionRefused { reason: message });
+        }
         Event::Error { context, message } if context.starts_with("voice") => {
             core.fail(VoiceError::Refused(format!("{context}: {message}")).into());
         }
