@@ -58,8 +58,10 @@ same. Run `rustup update stable` first; toolchain skew breaks clippy.
 
 Bump `version` in `Cargo.toml` on `develop`, open a PR from `develop` to
 `main`; a maintainer merges it with a merge commit. `.github/workflows/release.yml`
-then runs on `main`: if tag `v<version>` does not exist it runs the check,
-publishes to crates.io through trusted publishing (`rust-lang/crates-io-auth-action`
+then runs on `main`: if tag `v<version>` does not exist a `build` job with no
+credentials runs the check and `cargo package`; a separate `publish` job (environment
+`release`, the only one holding `id-token: write`) runs `cargo publish --no-verify`, so no
+dependency code runs while it holds the token. It publishes to crates.io through trusted publishing (`rust-lang/crates-io-auth-action`
 exchanges the workflow's OIDC identity for a short-lived token; nothing is
 stored), tags the commit and creates the GitHub release. A version already on
 crates.io is only tagged. The `wavvon-identity` dependency carries both a
