@@ -5,14 +5,19 @@ on:
     branches: [main]
 
 permissions:
-  contents: write
-  id-token: write
+  contents: read
 
 jobs:
-  release:
+  build:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+      release: ${{ steps.tag.outputs.exists == 'false' }}
+      publish: ${{ steps.published.outputs.exists == 'false' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
       - id: ver
         run: echo "version=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -1)" >> "$GITHUB_OUTPUT"
       - run: test -n "${{ steps.ver.outputs.version }}"
@@ -31,6 +36,7 @@ jobs:
           path: wavvon-server
           sparse-checkout: crates/identity/wire-vectors.json
           sparse-checkout-cone-mode: false
+          persist-credentials: false
       - if: steps.tag.outputs.exists == 'false'
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8
         with:
@@ -41,6 +47,8 @@ jobs:
           CI: "true"
           WAVVON_WIRE_VECTORS: ${{ github.workspace }}/wavvon-server/crates/identity/wire-vectors.json
       - if: steps.tag.outputs.exists == 'false'
+        run: cargo package -p wavvon-sdk --locked
+      - if: steps.tag.outputs.exists == 'false'
         id: published
         run: |
           if curl -fsS -A "Wavvon-sdk-rust release (https://github.com/Wavvon/Wavvon-sdk-rust)" "https://crates.io/api/v1/crates/wavvon-sdk/${{ steps.ver.outputs.version }}" >/dev/null 2>&1; then
@@ -48,17 +56,36 @@ jobs:
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
-      - if: steps.tag.outputs.exists == 'false' && steps.published.outputs.exists == 'false'
-        id: auth
+
+  publish:
+    needs: build
+    if: needs.build.outputs.release == 'true' && needs.build.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8
+      - id: auth
         uses: rust-lang/crates-io-auth-action@3268eb413133e2960fa4ae0e963ca76380c54cd9
-      - if: steps.tag.outputs.exists == 'false' && steps.published.outputs.exists == 'false'
-        run: cargo publish -p wavvon-sdk
+      - run: cargo publish -p wavvon-sdk --locked --no-verify
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
-      - if: steps.tag.outputs.exists == 'false'
-        env:
+
+  tag:
+    needs: [build, publish]
+    if: always() && needs.build.outputs.release == 'true' && needs.build.result == 'success' && (needs.publish.result == 'success' || needs.publish.result == 'skipped')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - env:
           GH_TOKEN: ${{ github.token }}
+          VERSION: v${{ needs.build.outputs.version }}
         run: |
-          git tag "v${{ steps.ver.outputs.version }}"
-          git push origin "v${{ steps.ver.outputs.version }}"
-          gh release create "v${{ steps.ver.outputs.version }}" --generate-notes --title "v${{ steps.ver.outputs.version }}"
+          gh api "repos/${{ github.repository }}/git/refs" -f ref="refs/tags/$VERSION" -f sha="${{ github.sha }}"
+          gh release create "$VERSION" --repo "${{ github.repository }}" --target "${{ github.sha }}" --generate-notes --title "$VERSION"
