@@ -226,16 +226,23 @@ async fn main() -> Out {
             && va.zones().iter().any(|z| z.zone_id == "smoke-zone")
     })
     .await?;
+    let t0 = std::time::Instant::now();
     for i in 0..10 {
         va.set_position("smoke-zone", &[10.0 + i as f64, 50.0])?;
         tokio::time::sleep(Duration::from_millis(10)).await;
     }
+    // One update per 50 ms window the loop spanned, plus the first and the final
+    // flush; timer slop stretches the loop, and nine keeps it a coalescing test.
+    let limit = (t0.elapsed().as_millis().div_ceil(50) as usize + 2).min(9);
     until("B to see the last position", || {
         seen_b2.lock().unwrap().positions.last() == Some(&vec![19.0, 50.0])
     })
     .await?;
     let n = seen_b2.lock().unwrap().positions.len();
-    assert!(n <= 4, "coalescing let {n} of 10 positions through");
+    assert!(
+        n <= limit,
+        "coalescing let {n} of 10 positions through (limit {limit})"
+    );
     println!("ten positions in 100 ms coalesced to {n}, ending at the last");
 
     // A position in someone else's creator-only zone is refused, as an event.
