@@ -35,12 +35,13 @@ rand = "0.10.3"
 thiserror = "2.0.21"
 axum = { version = "0.8.9", default-features = false, features = ["http1", "tokio", "json"], optional = true }
 uuid = { version = "1.26.1", features = ["serde"] }
-wtransport = { version = "0.7.1", optional = true }
+str0m = { version = "0.25", optional = true, default-features = false, features = ["aws-lc-rs"] }
+url = { version = "2", optional = true }
 audiopus = { version = "0.2", optional = true }
 
 [features]
 axum = ["dep:axum"]
-voice = ["dep:wtransport"]
+voice = ["dep:str0m", "dep:url"]
 voice-pcm = ["voice", "dep:audiopus"]
 
 [dev-dependencies]

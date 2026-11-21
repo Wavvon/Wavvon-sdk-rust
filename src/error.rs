@@ -84,10 +84,6 @@ pub enum DmError {
 /// Why a voice call could not proceed.
 #[derive(Debug, thiserror::Error)]
 pub enum VoiceError {
-    /// `voice_joined` carried no `voice_wt_url`: a hub older than voice
-    /// transport v2.
-    #[error("the hub offers no WebTransport voice endpoint")]
-    NoTransport,
     /// Talk power is below the channel's threshold, so the relay would drop
     /// every datagram. Lifted by `VoiceEvent::TalkGranted`.
     #[error("may_speak is false in this channel")]

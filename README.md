@@ -22,9 +22,10 @@ Not published yet. Use a path or git dependency:
 wavvon-sdk = { git = "https://github.com/Wavvon/Wavvon-sdk-rust", features = ["axum"] }
 ```
 
-Feature `axum` adds a ready webhook endpoint (`wavvon_sdk::axum_handler`). Feature `voice` adds voice (WebTransport,
-Opus passthrough, no C dependency); `voice-pcm` adds `send_pcm` and decoded PCM on receive (links libopus through
-`audiopus`, which needs a C compiler and cmake).
+Feature `axum` adds a ready webhook endpoint (`wavvon_sdk::axum_handler`). Feature `voice` adds voice (a WebRTC
+data channel through `str0m`, on hubs with `voice.webrtc`; Opus passthrough; DTLS comes from `aws-lc-rs`, which
+builds C code); `voice-pcm` adds `send_pcm` and decoded PCM on receive (links libopus through `audiopus`, which needs
+a C compiler and cmake).
 
 ## Quick start
 

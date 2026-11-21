@@ -288,6 +288,9 @@ pub enum ClientMessage {
     VoiceJoin { channel_id: String },
     #[serde(rename = "voice_leave")]
     VoiceLeave { channel_id: String },
+    /// Binds the WebRTC voice transport with the token from `voice_joined`.
+    #[serde(rename = "voice_rtc_offer")]
+    VoiceRtcOffer { token: String, sdp: String },
     #[serde(rename = "voice_speaking")]
     VoiceSpeaking { channel_id: String, speaking: bool },
     #[serde(rename = "voice_key_offer")]

@@ -1,6 +1,6 @@
 //! A program in a voice channel (sdk-voice.md). It does exactly what the
 //! desktop and web clients do: voice signalling rides one chat WebSocket, the
-//! audio rides a WebTransport session, and every datagram is sealed with a
+//! audio rides a WebRTC data channel, and every packet is sealed with a
 //! per-sender key wrapped to each listener's DH key.
 //!
 //! The SDK owns the mechanisms (key distribution and rotation, 20 ms pacing,
@@ -9,6 +9,7 @@
 //! events and calls.
 
 mod opus;
+mod transport;
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -148,7 +149,7 @@ struct State {
     remote: HashMap<(String, u32), ([u8; 32], [u8; 4])>,
     marks: HashMap<(u16, u32), u64>,
     zones: Vec<Zone>,
-    conn: Option<wtransport::Connection>,
+    conn: Option<Arc<transport::Link>>,
     pacing: Option<Pacing>,
     speaking: bool,
     last_send: Instant,
@@ -194,6 +195,9 @@ impl Client {
 
     pub async fn join_voice_with(&self, channel_id: &str, opts: VoiceOptions) -> Result<Voice> {
         self.require("channels.voice")?;
+        // Voice transport v3: a hub without it speaks only WebTransport, which
+        // this SDK no longer carries.
+        self.require("voice.webrtc")?;
         // Without a published key nobody wraps a voice key to this program and
         // it cannot unwrap theirs: it would be deaf and mute.
         self.publish_dh_key().await?;
@@ -328,11 +332,9 @@ async fn establish(core: &Arc<Core>, events: &mut EventStream, channel_id: &str)
     })
     .await??;
 
-    let url = joined["voice_wt_url"]
-        .as_str()
-        .ok_or(VoiceError::NoTransport)?;
-    let token = str_of(&joined, "voice_token");
-    let conn = connect_transport(url, token, joined["voice_cert_hash"].as_str()).await?;
+    let token = str_of(&joined, "voice_token").to_string();
+    let (link, deferred) = connect_transport(core, events, &token).await?;
+    let conn = Arc::new(link);
 
     let participants: Vec<Participant> = joined["participants"]
         .as_array()
@@ -373,33 +375,51 @@ async fn establish(core: &Arc<Core>, events: &mut EventStream, channel_id: &str)
         st.in_room = true;
     }
     spawn_offer(core, others);
+    // What arrived while the answer was awaited, a key bundle above all:
+    // dropping it would leave this room unable to open that speaker.
+    for ev in deferred {
+        handle_event(core, ev);
+    }
     Ok(())
 }
 
+/// Offers a WebRTC session bound by the voice token and waits for the hub's
+/// answer on the same socket, keeping every other event that arrives meanwhile.
 async fn connect_transport(
-    url: &str,
+    core: &Arc<Core>,
+    events: &mut EventStream,
     token: &str,
-    cert_hash: Option<&str>,
-) -> Result<wtransport::Connection> {
-    let bad = |e: &dyn std::fmt::Display| VoiceError::Transport(e.to_string());
-    let builder = wtransport::ClientConfig::builder().with_bind_default();
-    let config = match cert_hash {
-        Some(h) => {
-            let digest: [u8; 32] = hex::decode(h)
-                .map_err(|e| bad(&e))?
-                .try_into()
-                .map_err(|_| bad(&"voice_cert_hash is not a SHA-256 digest"))?;
-            builder
-                .with_server_certificate_hashes([wtransport::tls::Sha256Digest::new(digest)])
-                .build()
+) -> Result<(transport::Link, Vec<Event>)> {
+    let bad = |e: String| -> Error { VoiceError::Transport(e).into() };
+    let host = url::Url::parse(core.client.base())
+        .ok()
+        .and_then(|u| u.host_str().map(str::to_string))
+        .ok_or_else(|| bad("hub URL has no host".into()))?;
+    let (offer, sdp) = transport::Offer::new(&host).await.map_err(bad)?;
+    core.sender
+        .send(ClientMessage::VoiceRtcOffer {
+            token: token.to_string(),
+            sdp,
+        })
+        .await?;
+    let mut deferred = Vec::new();
+    let answer = step(async {
+        loop {
+            match events.next().await {
+                Some(Ok(Event::Unknown { raw })) if raw["type"] == "voice_rtc_answer" => {
+                    return Ok(str_of(&raw, "sdp").to_string())
+                }
+                Some(Ok(Event::Error { context, message })) if context == "voice_rtc_offer" => {
+                    return Err(VoiceError::Refused(message).into())
+                }
+                Some(Err(e)) => return Err(e),
+                None => return Err(Error::Closed),
+                Some(Ok(ev)) => deferred.push(ev),
+            }
         }
-        None => builder.with_native_certs().build(),
-    };
-    let endpoint = wtransport::Endpoint::client(config).map_err(|e| bad(&e))?;
-    let conn = step(endpoint.connect(format!("{url}?token={token}")))
-        .await?
-        .map_err(|e| bad(&e))?;
-    Ok(conn)
+    })
+    .await??;
+    Ok((offer.accept(&answer).map_err(bad)?, deferred))
 }
 
 fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
@@ -565,13 +585,9 @@ async fn run(core: Arc<Core>, mut events: EventStream, mut cmds: mpsc::Unbounded
     }
 }
 
-async fn receive(conn: &Option<wtransport::Connection>) -> std::result::Result<Vec<u8>, String> {
+async fn receive(conn: &Option<Arc<transport::Link>>) -> std::result::Result<Vec<u8>, String> {
     match conn {
-        Some(c) => c
-            .receive_datagram()
-            .await
-            .map(|d| d.payload().to_vec())
-            .map_err(|e| e.to_string()),
+        Some(c) => c.recv().await,
         None => std::future::pending().await,
     }
 }
@@ -582,9 +598,8 @@ async fn rejoin(core: &Arc<Core>, events: &mut EventStream) {
     let channel = {
         let mut st = lock(&core.state);
         st.in_room = false;
-        if let Some(c) = st.conn.take() {
-            c.close(wtransport::VarInt::from_u32(0), b"rejoin");
-        }
+        // Dropping the link ends its session.
+        st.conn = None;
         st.channel_id.clone()
     };
     core.emit(VoiceEvent::Rejoining);
@@ -984,11 +999,9 @@ impl Voice {
             if !st.may_speak {
                 return Err(VoiceError::MayNotSpeak.into());
             }
-            if let Some(max) = st.conn.as_ref().and_then(|c| c.max_datagram_size()) {
-                // 3 relay prefix bytes are added by the hub, not by us.
-                if 16 + packet.len() + 16 > max {
-                    return Err(VoiceError::PacketTooLarge(packet.len()).into());
-                }
+            // 3 relay prefix bytes are added by the hub, not by us.
+            if 16 + packet.len() + 16 + 3 > transport::MAX_PACKET {
+                return Err(VoiceError::PacketTooLarge(packet.len()).into());
             }
             let now = Instant::now();
             let p = st.pacing.get_or_insert(Pacing { next: now, ts: 0 });
@@ -1035,8 +1048,7 @@ impl Voice {
                 })
                 .await?;
         }
-        conn.send_datagram(&sealed)
-            .map_err(|e| VoiceError::Transport(e.to_string()))?;
+        conn.send(&sealed).map_err(VoiceError::Transport)?;
         Ok(())
     }
 
@@ -1134,9 +1146,7 @@ impl Voice {
             .sender
             .send(ClientMessage::VoiceLeave { channel_id })
             .await?;
-        if let Some(c) = conn {
-            c.close(wtransport::VarInt::from_u32(0), b"leave");
-        }
+        drop(conn);
         // Lets the hub read voice_leave before the socket closes.
         tokio::time::sleep(Duration::from_millis(100)).await;
         let _ = self.core.cmd.send(Cmd::Leave);
